@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+spring:
+  main:
+    allow-circular-references: true
+  application:
+    name: geo-saa-backend
+  profiles:
+    active: dev
+  datasource:
+    url: jdbc:mysql://localhost:3306/geo_saa?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+jwt:
+  secret: 2GUjCXxrgI/NJDTqrs+2C3ZvOusm9axlvBnFcXGGZRA=
+  expiration: 86400000
+
+# AI 配置
+ai:
+  openai:
+    api-key: ""
+    api-url: https://api.openai.com/v1
+    model: gpt-4
+  tongyi:
+    api-key: ""
+    api-url: https://dashscope.aliyuncs.com/api/v1
+  doubao:
+    api-key: ""
+    api-url: ""
+  simulation:
+    enabled: true  # 模拟模式，无 API Key 时返回模拟数据

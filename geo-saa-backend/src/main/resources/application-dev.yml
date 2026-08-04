@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/geo_saa?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+
+# 开发模式禁用 RabbitMQ
+app:
+  rabbitmq:
+    enabled: false
+
+logging:
+  level:
+    com.geosaa: debug

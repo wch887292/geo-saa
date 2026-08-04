@@ -1,0 +1,32 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Env
+.env
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+*.original
+
+# Temp
+bcryptjs/
+mysql_data/
+mysql_reset.sql
+package.json
+package-lock.json

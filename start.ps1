@@ -105,7 +105,7 @@ function Free-Port {
     foreach ($line in $lines) {
         $parts = $line.ToString() -split '\s+'
         $pid = $parts[-1]
-        if ($pid -match '^\d+$') {
+        if ($pid -match '^\d+$' -and $pid -ne '0') {
             Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
             Write-Info "端口 $Port 已释放 (PID: $pid)"
         }
@@ -118,6 +118,9 @@ function Free-Port {
 # ===========================================
 function Build-Backend {
     Write-Host "`n========== [2/6] 构建后端 ==========" -ForegroundColor $CYAN
+    # 先释放后端端口，避免 JAR 文件被锁定
+    Free-Port $BACKEND_PORT
+    Start-Sleep -Seconds 1
     if (Test-Path $BACKEND_JAR) {
         Write-Info "后端 JAR 已存在，跳过构建"
         return

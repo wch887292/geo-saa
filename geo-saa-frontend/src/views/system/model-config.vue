@@ -102,7 +102,7 @@
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 
 const pageLoading = ref(false)
 

@@ -1,14 +1,23 @@
+# 生产环境配置
+# 以下敏感项没有提供默认值，缺失时应用会在启动阶段直接失败（fail-fast），
+# 避免带着 root/root、示例密钥这类默认配置被误部署到线上。
 spring:
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/geo_saa?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:root}
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
+
+jwt:
+  secret: ${JWT_SECRET}
+
+cors:
+  # 生产环境必须显式指定前端域名，禁止通配
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+logging:
+  level:
+    root: info
+    com.geosaa: info

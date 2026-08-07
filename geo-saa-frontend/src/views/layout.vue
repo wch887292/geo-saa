@@ -73,7 +73,7 @@
         <div class="header-right">
           <el-dropdown trigger="click" @command="handleCommand">
             <span class="user-dropdown">
-              <el-avatar :size="32" icon="UserFilled" />
+              <el-avatar :size="32"><UserFilled /></el-avatar>
               <span class="username">{{ userStore.userInfo?.username || '用户' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
@@ -121,9 +121,10 @@ function toggleSidebar() {
   appStore.toggleSidebar()
 }
 
-function handleCommand(command) {
+async function handleCommand(command) {
   if (command === 'logout') {
-    userStore.logout()
+    // 需等待登出接口返回后再跳转，否则 token 被提前清除会导致登出请求失败
+    await userStore.logout()
     router.push('/login')
   }
 }

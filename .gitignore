@@ -1,21 +1,30 @@
 # Java
 target/
 *.class
-*.jar
 *.war
+# 注意：不要用无路径前缀的 *.jar，否则会连 maven wrapper 的 jar 一起忽略
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
 
 # Node
 node_modules/
 dist/
+.vite/
 
 # IDE
 .idea/
 *.iml
 .vscode/
 
-# Env
+# Env（只忽略真实密钥文件，模板文件必须入库）
 .env
+.env.local
+.env.*.local
+!.env.example
+
+# 日志
 *.log
+logs/
 
 # OS
 .DS_Store
@@ -24,9 +33,35 @@ Thumbs.db
 # Build
 *.original
 
-# Temp
+# 本地临时产物
 bcryptjs/
 mysql_data/
 mysql_reset.sql
-package.json
-package-lock.json
+
+# 仅忽略仓库根目录下的临时 Node 工程文件。
+# 修复前这里写的是无斜杠的 `package.json` / `package-lock.json`，
+# gitignore 的匹配规则会作用到任意层级，把 geo-saa-frontend/package-lock.json
+# 也一并忽略掉，导致克隆仓库后前端无法复现依赖版本。
+/package.json
+/package-lock.json
+/node_modules/
+
+# ---------- 本地/构建垃圾（绝不入库）----------
+
+# WorkBuddy 本地工作区数据（记忆、日志、缓存，含潜在敏感信息）
+.workbuddy/
+
+# 前端实验性构建产物（vite build 验证时遗留的临时目录）
+geo-saa-frontend/dist-*/
+geo-saa-frontend/dist-slim/
+geo-saa-frontend/dist-manual2/
+geo-saa-frontend/dist-measure/
+geo-saa-frontend/dist-measure3/
+geo-saa-frontend/dist-nomanual/
+
+# Vite 重优化时产生的临时配置快照
+geo-saa-frontend/vite.config.js.timestamp-*.mjs
+
+# 发布/工具压缩包（release artifact，非源码）
+*.zip
+tooling/

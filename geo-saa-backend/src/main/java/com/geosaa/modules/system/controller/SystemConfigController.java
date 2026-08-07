@@ -8,6 +8,7 @@ import com.geosaa.modules.system.entity.SystemConfig;
 import com.geosaa.modules.system.service.SystemConfigService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,10 +16,14 @@ import java.util.Map;
 
 /**
  * 系统配置控制器 - 系统配置管理、私有大模型配置、内网模式、API白名单
+ *
+ * <p>本控制器涉及密钥、内网开关、IP 白名单等高危配置，整体限定为管理员角色。
+ * 修复前项目中没有任何方法级鉴权，任意登录用户都可读写这些配置。
  */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class SystemConfigController {
 
     private final SystemConfigService systemConfigService;
@@ -37,9 +42,10 @@ public class SystemConfigController {
     }
 
     /**
-     * 健康检查
+     * 健康检查（匿名可访问，需覆盖类级别的管理员限制）
      */
     @GetMapping("/health")
+    @PreAuthorize("permitAll()")
     public Result<String> health() {
         return Result.success("ok");
     }

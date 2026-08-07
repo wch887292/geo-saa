@@ -9,6 +9,7 @@ import com.geosaa.modules.auth.entity.UserInfo;
 import com.geosaa.modules.auth.mapper.RolePermissionMapper;
 import com.geosaa.modules.auth.mapper.UserInfoMapper;
 import com.geosaa.security.JwtTokenProvider;
+import com.geosaa.security.TokenBlacklistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -27,17 +28,16 @@ import java.util.stream.Collectors;
 public class AuthService {
 
     private static final String LOGIN_ATTEMPT_KEY = "geo:login:attempt:";
-    private static final String TOKEN_BLACKLIST_KEY = "geo:token:blacklist:";
     private static final String REFRESH_TOKEN_KEY = "geo:token:refresh:";
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final long LOCK_DURATION_MINUTES = 30;
-    private static final long TOKEN_BLACKLIST_TTL_HOURS = 24;
 
     private final UserInfoMapper userInfoMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final TokenBlacklistService tokenBlacklistService;
 
     public LoginResponse login(LoginRequest request) {
         // 检查登录失败次数
@@ -79,15 +79,17 @@ public class AuthService {
     }
 
     public void logout(String username, String token) {
-        // 将 token 加入黑名单
-        if (token != null) {
-            String tokenKey = TOKEN_BLACKLIST_KEY + token;
-            redisTemplate.opsForValue().set(tokenKey, "logout", TOKEN_BLACKLIST_TTL_HOURS, TimeUnit.HOURS);
-        }
+        tokenBlacklistService.blacklist(token);
         log.info("用户登出: username={}", username);
     }
 
     public LoginResponse refreshToken(String refreshToken) {
+        // 先验签：确认它确实是本服务签发的、未过期的 refresh 类型令牌，
+        // 避免只靠 Redis key 存在性判断（拿到任意字符串都能试探）
+        if (refreshToken == null || !jwtTokenProvider.validateRefreshToken(refreshToken)) {
+            throw new UnauthorizedException("刷新令牌无效或已过期");
+        }
+
         String refreshKey = REFRESH_TOKEN_KEY + refreshToken;
         String username = (String) redisTemplate.opsForValue().get(refreshKey);
         if (username == null) {
@@ -174,7 +176,7 @@ public class AuthService {
      * 校验 Token 是否在黑名单中
      */
     public boolean isTokenBlacklisted(String token) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(TOKEN_BLACKLIST_KEY + token));
+        return tokenBlacklistService.isBlacklisted(token);
     }
 
     /**

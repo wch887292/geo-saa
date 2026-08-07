@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,23 @@ public class DiagnoseService {
     private final AiAdapterFactory aiAdapterFactory;
     private final TaskProgressService taskProgressService;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 自身的代理引用。
+     *
+     * <p>{@code @Async} 依赖 Spring AOP 代理生效，而类内部用 {@code this.xxx()} 调用
+     * 是不经过代理的——修复前 {@code createTask} 直接调 {@code executeDiagnosisAsync}，
+     * 异步注解完全失效，整个诊断（5 步 AI 调用）在 HTTP 请求线程里同步跑完，
+     * 接口注释写的“立即返回”从未成立。
+     *
+     * <p>用 {@link ObjectProvider} 做延迟自注入，调用时才解析 Bean，
+     * 因此不会构成构造期循环依赖（可以保持 allow-circular-references=false）。
+     */
+    private final ObjectProvider<DiagnoseService> selfProvider;
+
+    private DiagnoseService self() {
+        return selfProvider.getObject();
+    }
 
     public Page<AiDiagnoseTask> listTasks(int pageNum, int pageSize, String taskType, Integer status) {
         LambdaQueryWrapper<AiDiagnoseTask> wrapper = new LambdaQueryWrapper<>();
@@ -55,8 +73,8 @@ public class DiagnoseService {
         task.setCreatedBy(userId);
         diagnoseTaskMapper.insert(task);
 
-        // 异步执行诊断
-        executeDiagnosisAsync(task.getId(), request.getBrandName(), request.getTaskType(), request.getInputParams());
+        // 异步执行诊断（必须通过代理调用，否则 @Async 不生效）
+        self().executeDiagnosisAsync(task.getId(), request.getBrandName(), request.getTaskType(), request.getInputParams());
 
         return task;
     }
@@ -69,7 +87,7 @@ public class DiagnoseService {
     /**
      * 异步执行诊断
      */
-    @Async
+    @Async(com.geosaa.config.AsyncConfig.EXECUTOR_NAME)
     public void executeDiagnosisAsync(Long taskId, String brandName, String taskType, String inputParams) {
         String progressId = "diagnose:" + taskId;
         try {

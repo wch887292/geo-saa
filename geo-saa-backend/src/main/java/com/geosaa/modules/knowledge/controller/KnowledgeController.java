@@ -9,6 +9,7 @@ import com.geosaa.modules.knowledge.entity.KnowledgeVersionHistory;
 import com.geosaa.modules.knowledge.service.KnowledgeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -52,6 +53,7 @@ public class KnowledgeController {
      * 创建品牌信息
      */
     @PostMapping("/brands")
+    @PreAuthorize("hasAuthority('knowledge:all')")
     public Result<BrandInfo> createBrand(@Valid @RequestBody BrandInfo brandInfo) {
         knowledgeService.createBrand(brandInfo);
         return Result.success(brandInfo);
@@ -61,6 +63,7 @@ public class KnowledgeController {
      * 更新品牌信息
      */
     @PutMapping("/brands")
+    @PreAuthorize("hasAuthority('knowledge:all')")
     public Result<BrandInfo> updateBrand(@Valid @RequestBody BrandInfo brandInfo) {
         knowledgeService.updateBrand(brandInfo);
         return Result.success(brandInfo);
@@ -70,6 +73,7 @@ public class KnowledgeController {
      * 删除品牌信息
      */
     @DeleteMapping("/brands/{id}")
+    @PreAuthorize("hasAuthority('knowledge:all')")
     public Result<Void> deleteBrand(@PathVariable Long id) {
         knowledgeService.deleteBrand(id);
         return Result.success(null);
@@ -90,6 +94,7 @@ public class KnowledgeController {
      * 创建品牌知识（自动校验唯一性，初始化版本）
      */
     @PostMapping("/knowledge")
+    @PreAuthorize("hasAuthority('knowledge:all')")
     public Result<BrandKnowledge> createKnowledge(@Valid @RequestBody BrandKnowledge knowledge) {
         knowledgeService.createKnowledge(knowledge);
         return Result.success(knowledge);
@@ -99,6 +104,7 @@ public class KnowledgeController {
      * 更新品牌知识（自动递增版本号）
      */
     @PutMapping("/knowledge")
+    @PreAuthorize("hasAuthority('knowledge:all')")
     public Result<BrandKnowledge> updateKnowledge(@Valid @RequestBody BrandKnowledge knowledge) {
         knowledgeService.updateKnowledge(knowledge);
         return Result.success(knowledge);
@@ -108,6 +114,7 @@ public class KnowledgeController {
      * 删除品牌知识
      */
     @DeleteMapping("/knowledge/{id}")
+    @PreAuthorize("hasAuthority('knowledge:all')")
     public Result<Void> deleteKnowledge(@PathVariable Long id) {
         knowledgeService.deleteKnowledge(id);
         return Result.success(null);
@@ -128,6 +135,7 @@ public class KnowledgeController {
      * AI 自动结构化转换：将非结构化文本转为结构化 JSON
      */
     @PostMapping("/auto-structure/{brandId}")
+    @PreAuthorize("hasAuthority('knowledge:all')")
     public Result<String> autoStructure(@PathVariable Long brandId, @RequestBody Map<String, String> request) {
         String unstructuredText = request.get("text");
         if (unstructuredText == null || unstructuredText.isEmpty()) {

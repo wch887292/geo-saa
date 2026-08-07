@@ -10,10 +10,11 @@
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             style="width:100%"
+            @change="handleQuery"
           />
         </el-col>
         <el-col :xs="12" :sm="6" :md="4">
-          <el-button type="primary" @click="handleQuery" style="width:100%">查询</el-button>
+          <el-button type="primary" @click="loadAll" style="width:100%">查询</el-button>
         </el-col>
       </el-row>
     </el-card>
@@ -61,7 +62,7 @@
       <el-col :xs="24" :lg="12">
         <el-card shadow="hover">
           <template #header>
-            <span>AI 提及率趋势（多平台对比）</span>
+            <span>AI 提及率趋势（近 {{ trendDays }} 天）</span>
           </template>
           <TrendChart :chart-data="mentionTrendData" type="line" height="300px" />
         </el-card>
@@ -121,93 +122,135 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="pagination-wrap">
-        <el-pagination
-          v-model:current-page="page"
-          :page-size="10"
-          :total="total"
-          layout="prev, pager, next"
-          small
-        />
-      </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import TrendChart from '@/components/TrendChart.vue'
+import { getCoreMetrics, getTrend, getCompetitorComparison } from '@/api/monitor'
 
 const pageLoading = ref(false)
 const tableLoading = ref(false)
-const page = ref(1)
-const total = ref(6)
 const dateRange = ref([])
+const trendDays = ref(7)
 
 const stats = reactive({
-  mentionRate: 72.5,
-  mentionRateChange: 5.2,
-  topRate: 38.2,
-  topRateChange: 3.1,
-  brandCount: 6,
-  competitorCount: 18
+  mentionRate: 0,
+  mentionRateChange: 0,
+  topRate: 0,
+  topRateChange: 0,
+  brandCount: 0,
+  competitorCount: 0
 })
 
-const mentionTrendData = {
-  categories: ['7/28', '7/29', '7/30', '7/31', '8/1', '8/2', '8/3'],
-  series: [
-    { name: '豆包', data: [45, 48, 52, 50, 55, 58, 62] },
-    { name: '千问', data: [55, 58, 62, 60, 65, 68, 72] },
-    { name: 'Kimi', data: [40, 42, 45, 48, 50, 52, 55] },
-    { name: '通用AI', data: [60, 62, 65, 68, 70, 72, 75] }
-  ]
+const mentionTrendData = reactive({ categories: [], series: [] })
+const topTrendData = reactive({ categories: [], series: [] })
+const platformData = reactive({ categories: [], series: [] })
+const competitorRadarData = reactive({ indicator: [], series: [] })
+
+const analysisTable = ref([])
+
+function toLineData(trendRes, name) {
+  const data = (trendRes && trendRes.data && trendRes.data.data) || []
+  return {
+    categories: data.map((d) => d.label),
+    series: [{ name, data: data.map((d) => d.value) }]
+  }
 }
 
-const topTrendData = {
-  categories: ['7/28', '7/29', '7/30', '7/31', '8/1', '8/2', '8/3'],
-  series: [
-    { name: '首推占比', data: [28, 30, 32, 35, 36, 37, 38] }
-  ]
+async function loadCoreMetricsAndCompetitors() {
+  try {
+    const metricsRes = await getCoreMetrics()
+    const metrics = metricsRes.data || {}
+    stats.mentionRate = metrics.mentionRate || 0
+    stats.topRate = metrics.firstRecommendRate || 0
+
+    const compRes = await getCompetitorComparison()
+    const competitors = compRes.data || []
+    stats.brandCount = 1
+    stats.competitorCount = Math.max(0, competitors.length - 1)
+
+    competitorRadarData.indicator = [
+      { name: 'AI提及率', max: 100 },
+      { name: '首推占比', max: 100 },
+      { name: '收录量', max: 1000 }
+    ]
+    competitorRadarData.series = competitors.map((c) => ({
+      value: [c.mentionRate || 0, c.firstRecommendRate || 0, c.collectionCount || 0],
+      name: c.name
+    }))
+  } catch {
+    // 指标/竞品接口失败时保留默认 0 态
+  }
 }
 
-const platformData = {
-  categories: ['豆包', '千问', 'Kimi', '通用AI', '文心一言'],
-  series: [{
-    name: '收录量',
-    data: [128, 256, 96, 320, 192]
-  }]
+async function loadTrends() {
+  try {
+    const mention = await getTrend({ statType: 'mention_rate', period: 'day', days: trendDays.value })
+    const md = toLineData(mention, 'AI提及率')
+    mentionTrendData.categories = md.categories
+    mentionTrendData.series = md.series
+
+    const top = await getTrend({ statType: 'first_recommend_rate', period: 'day', days: trendDays.value })
+    const td = toLineData(top, '首推占比')
+    topTrendData.categories = td.categories
+    topTrendData.series = td.series
+
+    const platform = await getTrend({ statType: 'collection_count', period: 'day', days: trendDays.value })
+    const pd = toLineData(platform, '收录量')
+    platformData.categories = pd.categories
+    platformData.series = pd.series
+  } catch {
+    // 趋势接口失败保留空态
+  }
 }
 
-const competitorRadarData = {
-  indicator: [
-    { name: 'AI可见度', max: 100 },
-    { name: '关键词覆盖', max: 100 },
-    { name: '首推占比', max: 100 },
-    { name: '情感倾向', max: 100 },
-    { name: '内容质量', max: 100 }
-  ],
-  series: [
-    { value: [86, 78, 38, 72, 80], name: '本品牌', areaStyle: { color: 'rgba(64,158,255,0.2)' } },
-    { value: [72, 65, 32, 60, 70], name: '竞品A', areaStyle: { color: 'rgba(103,194,58,0.2)' } },
-    { value: [68, 71, 28, 55, 65], name: '竞品B', areaStyle: { color: 'rgba(230,162,60,0.2)' } }
-  ]
+async function loadAnalysis() {
+  tableLoading.value = true
+  try {
+    const mention = await getTrend({ statType: 'mention_rate', period: 'month', days: 365 })
+    const top = await getTrend({ statType: 'first_recommend_rate', period: 'month', days: 365 })
+    const mData = (mention.data && mention.data.data) || []
+    const tData = (top.data && top.data.data) || []
+    analysisTable.value = mData.map((m, i) => ({
+      month: m.label,
+      mentionRate: m.value,
+      topRate: tData[i] ? tData[i].value : 0,
+      coverage: 0,
+      competitorAvg: 0,
+      trend: 0
+    }))
+  } catch {
+    analysisTable.value = []
+  } finally {
+    tableLoading.value = false
+  }
 }
-
-const analysisTable = ref([
-  { month: '2024-07', mentionRate: 72.5, topRate: 38.2, coverage: 65, competitorAvg: 58.3, trend: 5.2 },
-  { month: '2024-06', mentionRate: 68.3, topRate: 35.1, coverage: 62, competitorAvg: 56.8, trend: 3.8 },
-  { month: '2024-05', mentionRate: 64.5, topRate: 32.0, coverage: 58, competitorAvg: 55.2, trend: 4.2 },
-  { month: '2024-04', mentionRate: 60.3, topRate: 28.5, coverage: 55, competitorAvg: 53.5, trend: -1.5 },
-  { month: '2024-03', mentionRate: 61.8, topRate: 30.2, coverage: 56, competitorAvg: 54.0, trend: 2.1 },
-  { month: '2024-02', mentionRate: 59.7, topRate: 28.8, coverage: 53, competitorAvg: 52.6, trend: 0.5 }
-])
 
 function handleQuery() {
-  ElMessage.success('数据已更新')
+  if (dateRange.value && dateRange.value.length === 2) {
+    const start = new Date(dateRange.value[0])
+    const end = new Date(dateRange.value[1])
+    const diffDays = Math.round((end - start) / 86400000) + 1
+    trendDays.value = Math.min(Math.max(diffDays, 1), 90)
+  } else {
+    trendDays.value = 7
+  }
+  loadTrends()
 }
 
-onMounted(() => {})
+function loadAll() {
+  loadCoreMetricsAndCompetitors()
+  loadTrends()
+  loadAnalysis()
+}
+
+onMounted(() => {
+  loadAll()
+})
 </script>
 
 <style scoped>
@@ -233,9 +276,4 @@ onMounted(() => {})
 .trend-up { color: #67c23a; }
 .trend-down { color: #f56c6c; }
 .content-row { margin-bottom: 20px; }
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
 </style>

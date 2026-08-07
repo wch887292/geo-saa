@@ -1,8 +1,4 @@
 spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/geo_saa?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: root
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
@@ -11,6 +7,14 @@ spring:
 app:
   rabbitmq:
     enabled: false
+
+jwt:
+  # 仅供本地开发使用的固定密钥。生产环境由 application-prod.yml 强制要求 JWT_SECRET 环境变量。
+  secret: ${JWT_SECRET:2GUjCXxrgI/NJDTqrs+2C3ZvOusm9axlvBnFcXGGZRA=}
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 logging:
   level:

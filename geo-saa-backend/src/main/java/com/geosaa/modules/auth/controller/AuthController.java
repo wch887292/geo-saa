@@ -36,7 +36,8 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public Result<Void> logout(Principal principal,
-                               @RequestHeader("Authorization") String authHeader) {
+                               @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        // Authorization 头设为非必填：缺失时不应返回 400，登出应始终幂等成功
         if (principal != null) {
             String token = authHeader != null && authHeader.startsWith("Bearer ") ?
                     authHeader.substring(7) : null;

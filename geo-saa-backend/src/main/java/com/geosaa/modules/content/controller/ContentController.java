@@ -6,11 +6,12 @@ import com.geosaa.common.Result;
 import com.geosaa.modules.content.dto.ContentGenerateRequest;
 import com.geosaa.modules.content.entity.AiArticleContent;
 import com.geosaa.modules.content.service.ContentService;
+import com.geosaa.security.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
@@ -50,9 +51,9 @@ public class ContentController {
      * 创建内容（自动合规检测）
      */
     @PostMapping("/create")
-    public Result<AiArticleContent> create(@Valid @RequestBody ContentGenerateRequest request, Principal principal) {
-        // TODO: 从 Principal 中解析用户 ID
-        AiArticleContent content = contentService.createContent(request, 1L);
+    @PreAuthorize("hasAuthority('content:all')")
+    public Result<AiArticleContent> create(@Valid @RequestBody ContentGenerateRequest request) {
+        AiArticleContent content = contentService.createContent(request, SecurityUtils.getCurrentUserId());
         return Result.success(content);
     }
 
@@ -60,6 +61,7 @@ public class ContentController {
      * 更新内容
      */
     @PutMapping("/update")
+    @PreAuthorize("hasAuthority('content:all')")
     public Result<AiArticleContent> update(@Valid @RequestBody AiArticleContent content) {
         contentService.updateContent(content);
         return Result.success(content);
@@ -69,6 +71,7 @@ public class ContentController {
      * 删除内容
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('content:all')")
     public Result<Void> delete(@PathVariable Long id) {
         contentService.deleteContent(id);
         return Result.success(null);
@@ -78,6 +81,7 @@ public class ContentController {
      * AI 生成单篇内容
      */
     @PostMapping("/generate/{id}")
+    @PreAuthorize("hasAuthority('content:all')")
     public Result<AiArticleContent> generateWithAi(@PathVariable Long id) {
         AiArticleContent content = contentService.generateWithAi(id);
         return Result.success(content);
@@ -87,8 +91,9 @@ public class ContentController {
      * 批量生成文章（使用 RabbitMQ 异步队列）
      */
     @PostMapping("/batch-generate")
-    public Result<List<Long>> batchGenerate(@Valid @RequestBody List<ContentGenerateRequest> requests, Principal principal) {
-        List<Long> contentIds = contentService.batchGenerateArticles(requests, 1L);
+    @PreAuthorize("hasAuthority('content:all')")
+    public Result<List<Long>> batchGenerate(@Valid @RequestBody List<ContentGenerateRequest> requests) {
+        List<Long> contentIds = contentService.batchGenerateArticles(requests, SecurityUtils.getCurrentUserId());
         return Result.success("批量生成任务已提交，共" + contentIds.size() + "篇", contentIds);
     }
 
@@ -96,8 +101,9 @@ public class ContentController {
      * 批量生成短视频脚本
      */
     @PostMapping("/batch-scripts")
-    public Result<List<AiArticleContent>> batchScripts(@Valid @RequestBody List<ContentGenerateRequest> requests, Principal principal) {
-        List<AiArticleContent> contents = contentService.batchGenerateScripts(requests, 1L);
+    @PreAuthorize("hasAuthority('content:all')")
+    public Result<List<AiArticleContent>> batchScripts(@Valid @RequestBody List<ContentGenerateRequest> requests) {
+        List<AiArticleContent> contents = contentService.batchGenerateScripts(requests, SecurityUtils.getCurrentUserId());
         return Result.success("脚本生成任务已提交，共" + contents.size() + "个", contents);
     }
 

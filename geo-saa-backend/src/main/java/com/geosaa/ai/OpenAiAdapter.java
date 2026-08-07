@@ -3,6 +3,7 @@ package com.geosaa.ai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -25,8 +26,13 @@ public class OpenAiAdapter implements AiAdapter {
     @Value("${ai.simulation.enabled:true}")
     private boolean simulationEnabled;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    /** 带超时配置的 RestTemplate，见 {@link com.geosaa.config.RestTemplateConfig} */
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public OpenAiAdapter(@Qualifier("aiRestTemplate") RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     @Override
     public String getType() {

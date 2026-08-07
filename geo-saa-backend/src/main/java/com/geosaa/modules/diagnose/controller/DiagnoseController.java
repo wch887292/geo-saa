@@ -7,11 +7,12 @@ import com.geosaa.modules.common.TaskProgress;
 import com.geosaa.modules.diagnose.dto.DiagnoseRequest;
 import com.geosaa.modules.diagnose.entity.AiDiagnoseTask;
 import com.geosaa.modules.diagnose.service.DiagnoseService;
+import com.geosaa.security.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
 import java.util.Map;
 
 /**
@@ -50,9 +51,9 @@ public class DiagnoseController {
      * 创建诊断任务（异步执行，立即返回）
      */
     @PostMapping("/create")
-    public Result<AiDiagnoseTask> create(@Valid @RequestBody DiagnoseRequest request, Principal principal) {
-        // TODO: 从 Principal 中解析用户 ID
-        AiDiagnoseTask task = diagnoseService.createTask(request, 1L);
+    @PreAuthorize("hasAuthority('diagnose:all')")
+    public Result<AiDiagnoseTask> create(@Valid @RequestBody DiagnoseRequest request) {
+        AiDiagnoseTask task = diagnoseService.createTask(request, SecurityUtils.getCurrentUserId());
         return Result.success(task);
     }
 
@@ -60,6 +61,7 @@ public class DiagnoseController {
      * 删除诊断任务
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('diagnose:all')")
     public Result<Void> delete(@PathVariable Long id) {
         diagnoseService.deleteTask(id);
         return Result.success(null);

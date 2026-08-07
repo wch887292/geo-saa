@@ -50,7 +50,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 
@@ -92,8 +92,8 @@ async function handleLogin() {
     ElMessage.success('登录成功')
     const redirect = route.query.redirect || '/dashboard'
     router.push(redirect)
-  } catch (err) {
-    ElMessage.error(err?.response?.data?.message || '登录失败，请检查用户名和密码')
+  } catch {
+    // 失败原因已由 axios 响应拦截器统一提示，避免重复弹窗
   } finally {
     loading.value = false
   }

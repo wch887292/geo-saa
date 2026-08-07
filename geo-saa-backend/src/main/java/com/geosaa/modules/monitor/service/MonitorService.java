@@ -101,10 +101,15 @@ public class MonitorService {
         DataMonitorStat collectStat = monitorStatMapper.selectOne(collectWrapper);
         metrics.put("collectionCount", collectStat != null ? collectStat.getStatValue() : new Random().nextInt(1000));
 
-        // 综合评分
-        int score = (int) ((double) metrics.get("mentionRate") * 0.4
-                + (double) metrics.get("firstRecommendRate") * 0.35
-                + Math.min(100, (long) metrics.get("collectionCount") / 10) * 0.25);
+        // 综合评分：metrics 中存放的是装箱数值（Long/Integer），直接 (double)/(long) 强转
+        // 会在运行时触发 ClassCastException（Long/Integer 不能强转为 Double/Long）。
+        // 统一按 Number 安全拆箱，兼容 Long 与 Integer 两种类型。
+        long mentionRate = ((Number) metrics.get("mentionRate")).longValue();
+        long firstRecommendRate = ((Number) metrics.get("firstRecommendRate")).longValue();
+        long collectionCount = ((Number) metrics.get("collectionCount")).longValue();
+        int score = (int) (mentionRate * 0.4
+                + firstRecommendRate * 0.35
+                + Math.min(100, collectionCount / 10) * 0.25);
         metrics.put("score", Math.min(100, score));
 
         // 缓存 5 分钟

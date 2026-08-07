@@ -75,7 +75,8 @@
           <template #header>
             <span>今日待办</span>
           </template>
-          <el-timeline>
+          <el-empty v-if="todos.length === 0" description="暂无待办" :image-size="50" />
+          <el-timeline v-else>
             <el-timeline-item
               v-for="item in todos"
               :key="item.id"
@@ -134,50 +135,70 @@ import { ref, reactive, onMounted } from 'vue'
 import BrandScore from '@/components/BrandScore.vue'
 import TrendChart from '@/components/TrendChart.vue'
 import TaskProgress from '@/components/TaskProgress.vue'
-import { ElMessage } from 'element-plus'
+import { getDashboardStatistics } from '@/api/statistics'
 
 const pageLoading = ref(false)
 
 const stats = reactive({
-  visibilityScore: 86,
-  visibilityChange: 5.2,
-  contentTotal: '1,284',
-  contentGrowth: 12.3,
-  distributeSuccess: '967',
-  distributeRate: 75,
-  rank: 3,
-  rankChange: 2
+  visibilityScore: 0,
+  visibilityChange: 0,
+  contentTotal: 0,
+  contentGrowth: 0,
+  distributeSuccess: 0,
+  distributeRate: 0,
+  rank: '-',
+  rankChange: 0
 })
 
-const trendData = {
-  categories: ['7/28', '7/29', '7/30', '7/31', '8/1', '8/2', '8/3'],
-  series: [
-    { name: '本品牌', data: [65, 72, 68, 78, 82, 79, 86] },
-    { name: '竞品A', data: [55, 58, 62, 60, 65, 63, 60] },
-    { name: '竞品B', data: [45, 48, 52, 50, 55, 58, 54] }
-  ]
+const trendData = reactive({ categories: [], series: [] })
+const todos = ref([])
+const runningTasks = ref([])
+const recentReports = ref([])
+
+function num(v, fallback = 0) {
+  return typeof v === 'number' ? v : fallback
 }
 
-const todos = ref([
-  { id: 1, text: '完成品牌 AI 诊断报告', time: '09:00', done: false },
-  { id: 2, text: '审核本周创作内容', time: '10:30', done: false },
-  { id: 3, text: '检查各渠道分发状态', time: '14:00', done: true },
-  { id: 4, text: '更新知识库条目', time: '16:00', done: false }
-])
+async function loadDashboard() {
+  pageLoading.value = true
+  try {
+    const res = await getDashboardStatistics()
+    const data = res.data || {}
+    stats.visibilityScore = num(data.visibilityScore)
+    stats.visibilityChange = num(data.visibilityChange)
+    stats.contentTotal = num(data.contentTotal)
+    stats.contentGrowth = num(data.contentGrowth)
+    stats.distributeSuccess = num(data.distributeSuccess)
+    stats.distributeRate = num(data.distributeRate)
+    stats.rank = data.rank == null ? '-' : data.rank
+    stats.rankChange = num(data.rankChange)
 
-const runningTasks = ref([
-  { id: 1, name: '全域内容分发 - 品牌A', progress: 65, status: 'running', detail: '3/5 渠道完成' },
-  { id: 2, name: '竞品数据采集', progress: 30, status: 'running', detail: '采集分析中' }
-])
+    const td = data.trendData || {}
+    trendData.categories = td.categories || []
+    trendData.series = td.series || []
 
-const recentReports = ref([
-  { id: 1, name: '2024年7月AI可见度报告', date: '2024-07-31' },
-  { id: 2, name: '竞品分析报告 - 季度', date: '2024-07-25' },
-  { id: 3, name: '内容质量评估报告', date: '2024-07-20' }
-])
+    todos.value = data.todos || []
+    runningTasks.value = (data.runningTasks || []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      progress: num(t.progress),
+      status: t.status,
+      detail: t.detail
+    }))
+    recentReports.value = (data.recentReports || []).map((r) => ({
+      id: r.id,
+      name: r.name,
+      date: r.date
+    }))
+  } catch {
+    // 接口失败时保留默认空态，不阻断页面渲染
+  } finally {
+    pageLoading.value = false
+  }
+}
 
 onMounted(() => {
-  // API calls would go here
+  loadDashboard()
 })
 </script>
 

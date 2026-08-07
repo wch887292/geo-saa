@@ -61,7 +61,9 @@ public class ContentMessageListener {
                     content.setContent((String) resultMap.get("content"));
                 }
                 if (resultMap.containsKey("keywords") && resultMap.get("keywords") instanceof java.util.List) {
-                    content.setKeywords(String.join(",", (java.util.List<String>) resultMap.get("keywords")));
+                    @SuppressWarnings("unchecked")
+                    java.util.List<String> kwList = (java.util.List<String>) resultMap.get("keywords");
+                    content.setKeywords(String.join(",", kwList));
                 }
             } catch (Exception e) {
                 // 不是 JSON 格式，直接存原始结果

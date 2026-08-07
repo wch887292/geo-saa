@@ -3,6 +3,7 @@ package com.geosaa.modules.content.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.geosaa.ai.AiAdapterFactory;
+import com.geosaa.common.Constant;
 import com.geosaa.common.exception.BusinessException;
 import com.geosaa.config.RabbitMqConfig;
 import com.geosaa.modules.content.dto.ContentGenerateRequest;
@@ -13,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,16 @@ public class ContentService {
     @Autowired(required = false)
     private RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 自身代理引用，用于让 {@code @Async} 在类内部调用时依然生效。
+     * 详见 {@code DiagnoseService} 中的同类说明。
+     */
+    private final ObjectProvider<ContentService> selfProvider;
+
+    private ContentService self() {
+        return selfProvider.getObject();
+    }
 
     // 敏感词库
     private static final List<String> SENSITIVE_WORDS = Arrays.asList(
@@ -78,7 +90,7 @@ public class ContentService {
         content.setKeywords(request.getKeywords());
         content.setSummary(request.getSummary());
         content.setContent(request.getContent());
-        content.setStatus(0);
+        content.setStatus(Constant.TASK_STATUS_PENDING);
         content.setCreatedBy(userId);
         articleContentMapper.insert(content);
         return content;
@@ -106,7 +118,7 @@ public class ContentService {
             content.setBrandName(request.getBrandName());
             content.setKeywords(request.getKeywords());
             content.setSummary(request.getSummary());
-            content.setStatus(0); // 待生成
+            content.setStatus(Constant.TASK_STATUS_PENDING); // 待生成
             content.setCreatedBy(userId);
             articleContentMapper.insert(content);
 
@@ -148,35 +160,48 @@ public class ContentService {
             content.setBrandName(request.getBrandName());
             content.setKeywords(request.getKeywords());
             content.setSummary(request.getSummary());
-            content.setStatus(0);
+            content.setStatus(Constant.TASK_STATUS_PENDING);
             content.setCreatedBy(userId);
             articleContentMapper.insert(content);
 
-            // 异步生成脚本内容
-            asyncGenerateScript(content.getId(), request.getTitle(), request.getBrandName(), request.getKeywords());
+            // 异步生成脚本内容（必须通过代理调用，否则 @Async 不生效）
+            self().asyncGenerateScript(content.getId(), request.getTitle(), request.getBrandName(), request.getKeywords());
             return content;
         }).collect(Collectors.toList());
     }
 
-    @Async
+    /**
+     * 异步生成短视频脚本。
+     *
+     * <p>修复点：原实现成功后写 {@code status=1}，但 {@link #generateWithAi} 里
+     * 1 表示“生成中”、2 才是“已完成”，同一张表两套语义，
+     * 导致脚本生成完成后前端永远显示“生成中”。现统一使用 {@link Constant} 的状态常量。
+     */
+    @Async(com.geosaa.config.AsyncConfig.EXECUTOR_NAME)
     public void asyncGenerateScript(Long contentId, String title, String brandName, String keywords) {
         try {
+            updateStatus(contentId, Constant.TASK_STATUS_PROCESSING);
+
             String prompt = "为品牌「" + (brandName != null ? brandName : "") + "」生成一个关于「" + title + "」的短视频脚本，关键词：" + keywords;
             String result = aiAdapterFactory.getAdapter("openai").generateContent(prompt, "短视频脚本", 800);
 
             AiArticleContent content = articleContentMapper.selectById(contentId);
             if (content != null) {
                 content.setContent(result);
-                content.setStatus(1);
+                content.setStatus(Constant.TASK_STATUS_COMPLETED);
                 articleContentMapper.updateById(content);
             }
         } catch (Exception e) {
             log.error("异步生成脚本失败: contentId={}", contentId, e);
-            AiArticleContent content = articleContentMapper.selectById(contentId);
-            if (content != null) {
-                content.setStatus(3);
-                articleContentMapper.updateById(content);
-            }
+            updateStatus(contentId, Constant.TASK_STATUS_FAILED);
+        }
+    }
+
+    private void updateStatus(Long contentId, Integer status) {
+        AiArticleContent content = articleContentMapper.selectById(contentId);
+        if (content != null) {
+            content.setStatus(status);
+            articleContentMapper.updateById(content);
         }
     }
 
@@ -219,7 +244,7 @@ public class ContentService {
             throw new BusinessException("内容记录不存在");
         }
         try {
-            content.setStatus(1); // 生成中
+            content.setStatus(Constant.TASK_STATUS_PROCESSING); // 生成中
             articleContentMapper.updateById(content);
 
             String prompt = content.getTitle() + " - " + (content.getSummary() != null ? content.getSummary() : "");
@@ -243,11 +268,11 @@ public class ContentService {
                 content.setContent(result);
             }
 
-            content.setStatus(2); // 已完成
+            content.setStatus(Constant.TASK_STATUS_COMPLETED); // 已完成
             articleContentMapper.updateById(content);
         } catch (Exception e) {
             log.error("AI生成内容失败: contentId={}", contentId, e);
-            content.setStatus(3); // 失败
+            content.setStatus(Constant.TASK_STATUS_FAILED); // 失败
             articleContentMapper.updateById(content);
         }
         return content;

@@ -6,7 +6,28 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import * as echarts from 'echarts'
+// 按需引入：全量 import * as echarts 会打进约 1MB 产物，
+// 这里只注册实际用到的图表类型与组件。
+import * as echarts from 'echarts/core'
+import { LineChart, BarChart, RadarChart } from 'echarts/charts'
+import {
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  RadarComponent
+} from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+
+echarts.use([
+  LineChart,
+  BarChart,
+  RadarChart,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  RadarComponent,
+  CanvasRenderer
+])
 
 const props = defineProps({
   chartData: { type: Object, default: () => ({}) },
@@ -18,7 +39,9 @@ const chartRef = ref(null)
 let chartInstance = null
 
 function getOption() {
-  const { data = {} } = props
+  // 修复：原实现写的是 `const { data = {} } = props`，但组件根本没有名为 data 的 prop，
+  // 解构结果恒为 {}，导致 categories / series 永远为空——图表从来没渲染出过真实数据。
+  const data = props.chartData || {}
   const baseOption = {
     tooltip: { trigger: 'axis' },
     legend: { type: 'scroll', bottom: 0 },

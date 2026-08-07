@@ -8,6 +8,7 @@ import com.geosaa.modules.monitor.service.MonitorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -53,6 +54,7 @@ public class MonitorController {
      * 添加统计数据
      */
     @PostMapping("/add")
+    @PreAuthorize("hasAuthority('monitor:all')")
     public Result<Void> add(@Valid @RequestBody DataMonitorStat stat) {
         monitorService.addStat(stat);
         return Result.success(null);

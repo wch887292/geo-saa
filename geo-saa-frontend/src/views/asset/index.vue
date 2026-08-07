@@ -5,7 +5,7 @@
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
             <div class="stat-value">{{ stats.totalAssets }}</div>
-            <div class="stat-label">总资产数</div>
+            <div class="stat-label">内容资产数</div>
           </div>
         </el-card>
       </el-col>
@@ -13,7 +13,7 @@
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
             <div class="stat-value">{{ stats.published }}</div>
-            <div class="stat-label">已发布数</div>
+            <div class="stat-label">已分发发布数</div>
           </div>
         </el-card>
       </el-col>
@@ -30,25 +30,26 @@
     <el-card shadow="hover" class="filter-card">
       <el-row :gutter="20" align="middle">
         <el-col :span="6">
-          <el-date-picker v-model="filterYear" type="year" placeholder="选择年份" style="width:100%" />
+          <el-date-picker v-model="filterYear" type="year" placeholder="选择年份" style="width:100%" value-format="yyyy" />
         </el-col>
         <el-col :span="6">
-          <el-date-picker v-model="filterMonth" type="month" placeholder="选择月份" style="width:100%" />
+          <el-date-picker v-model="filterMonth" type="month" placeholder="选择月份" style="width:100%" value-format="yyyy-MM" />
         </el-col>
         <el-col :span="2">
-          <el-button type="primary" @click="handleFilter">过滤</el-button>
+          <el-button type="primary" @click="loadAll">过滤</el-button>
         </el-col>
       </el-row>
     </el-card>
 
     <el-card shadow="hover" class="timeline-card">
       <template #header>
-        <span>内容资产时间线</span>
+        <span>品牌资产时间线（内容 / 知识 / 分发 / 诊断）</span>
       </template>
-      <el-timeline>
+      <el-empty v-if="timeline.length === 0" description="暂无资产" :image-size="50" />
+      <el-timeline v-else>
         <el-timeline-item
           v-for="item in timeline"
-          :key="item.id"
+          :key="item.assetType + '-' + item.id"
           :timestamp="item.date"
           :type="item.type"
           size="large"
@@ -57,11 +58,13 @@
           <div class="timeline-content">
             <h4>{{ item.title }}</h4>
             <p>{{ item.description }}</p>
-            <el-tag size="small" style="margin-top:4px">{{ item.typeLabel }}</el-tag>
+            <el-tag size="small" style="margin-top:4px">{{ item.typeLabel }} · {{ item.status }}</el-tag>
             <div v-if="item.showDetail" class="timeline-detail">
               <el-descriptions :column="2" size="small" border>
+                <el-descriptions-item label="资产类型">{{ assetTypeLabel(item.assetType) }}</el-descriptions-item>
                 <el-descriptions-item label="状态">{{ item.status }}</el-descriptions-item>
-                <el-descriptions-item label="创建时间">{{ item.createdAt }}</el-descriptions-item>
+                <el-descriptions-item label="创建时间">{{ item.date }}</el-descriptions-item>
+                <el-descriptions-item label="归属">{{ item.brandName || item.brandId || '-' }}</el-descriptions-item>
               </el-descriptions>
             </div>
           </div>
@@ -73,15 +76,16 @@
       <el-col :xs="24" :lg="12">
         <el-card shadow="hover">
           <template #header>
-            <span>内容存档</span>
+            <span>内容存档（内容资产）</span>
           </template>
-          <el-table :data="archiveList" stripe style="width:100%">
+          <el-empty v-if="archiveList.length === 0" description="暂无存档" :image-size="50" />
+          <el-table v-else :data="archiveList" stripe style="width:100%">
             <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
-            <el-table-column prop="type" label="类型" width="80" />
+            <el-table-column prop="type" label="类型" width="100" />
             <el-table-column prop="date" label="日期" width="120" />
             <el-table-column label="操作" width="90" fixed="right">
-              <template #default>
-                <el-button size="small" type="primary" link>下载</el-button>
+              <template #default="{ row }">
+                <el-button size="small" type="primary" link @click="downloadAsset(row)">下载</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -91,120 +95,163 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>媒体发布记录</span>
-              <el-button size="small" @click="showUpload = true">上传截图</el-button>
+              <span>媒体发布记录（分发任务 · 已完成）</span>
             </div>
           </template>
-          <el-table :data="publishRecords" stripe style="width:100%">
+          <el-empty v-if="publishRecords.length === 0" description="暂无发布记录" :image-size="50" />
+          <el-table v-else :data="publishRecords" stripe style="width:100%">
             <el-table-column prop="title" label="内容标题" min-width="140" show-overflow-tooltip />
             <el-table-column prop="channel" label="发布渠道" width="100" />
             <el-table-column prop="date" label="发布时间" width="120" />
             <el-table-column label="截图" width="70">
               <template #default>
-                <el-button size="small" type="primary" link @click="viewScreenshot">查看</el-button>
+                <el-button size="small" type="primary" link @click="ElMessage.info('截图存证功能待接入')">查看</el-button>
               </template>
             </el-table-column>
           </el-table>
         </el-card>
       </el-col>
     </el-row>
-
-    <el-dialog v-model="showUpload" title="上传截图" width="500px">
-      <el-upload
-        drag
-        action="#"
-        :auto-upload="false"
-        list-type="picture-card"
-        multiple
-        :on-change="handleUploadChange"
-      >
-        <el-icon class="upload-icon" :size="32"><Plus /></el-icon>
-        <div class="upload-text">点击或拖拽上传</div>
-      </el-upload>
-      <div style="margin-top:12px">
-        <el-radio-group v-model="uploadType">
-          <el-radio label="publish">发布截图</el-radio>
-          <el-radio label="ai">AI平台引用截图</el-radio>
-        </el-radio-group>
-      </div>
-      <template #footer>
-        <el-button @click="showUpload = false">取消</el-button>
-        <el-button type="primary" @click="handleUpload">确认上传</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="showScreenshot" title="截图预览" width="500px">
-      <div class="screenshot-placeholder">
-        <el-icon :size="48" color="#c0c4cc"><Picture /></el-icon>
-        <p>截图预览区域</p>
-      </div>
-      <template #footer>
-        <el-button type="primary" @click="showScreenshot = false">关闭</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus/es/components/message/index.mjs'
+import { getAssetOverview, getAssetList } from '@/api/asset'
 
 const pageLoading = ref(false)
-const showUpload = ref(false)
-const showScreenshot = ref(false)
-const uploadType = ref('publish')
 const filterYear = ref(null)
 const filterMonth = ref(null)
 
 const stats = reactive({
-  totalAssets: 128,
-  published: 96,
-  screenshots: 45
+  totalAssets: 0,
+  published: 0,
+  screenshots: 0
 })
 
-const timeline = ref([
-  { id: 1, title: '品牌内容策略文档', description: '完成品牌核心内容策略制定', date: '2024-07-28', type: 'primary', typeLabel: '策略文档', status: '已完成', createdAt: '2024-07-28 10:00', showDetail: false },
-  { id: 2, title: '产品白皮书发布', description: '发布至官网及行业媒体', date: '2024-07-25', type: 'success', typeLabel: '发布', status: '已发布', createdAt: '2024-07-25 14:30', showDetail: false },
-  { id: 3, title: '行业洞察报告', description: '生成并分发至各渠道', date: '2024-07-20', type: 'warning', typeLabel: '报告', status: '已完成', createdAt: '2024-07-20 09:00', showDetail: false },
-  { id: 4, title: '品牌故事创作', description: '完成品牌故事初稿', date: '2024-07-15', type: 'info', typeLabel: '创作', status: '草稿', createdAt: '2024-07-15 16:00', showDetail: false }
-])
+const timeline = ref([])
+const archiveList = ref([])
+const publishRecords = ref([])
 
-const archiveList = ref([
-  { title: 'Q3品牌内容资产包', type: '压缩包', date: '2024-07-30' },
-  { title: '产品白皮书V2.1', type: 'PDF', date: '2024-07-25' },
-  { title: '行业洞察报告-7月', type: 'PDF', date: '2024-07-20' }
-])
+const ASSET_TYPE_LABEL = {
+  content: '内容',
+  knowledge: '知识',
+  distribute: '分发',
+  diagnose: '诊断'
+}
 
-const publishRecords = ref([
-  { title: '产品白皮书V2.1', channel: '官网', date: '2024-07-25' },
-  { title: 'AI驱动品牌增长', channel: '知乎', date: '2024-07-22' },
-  { title: '行业洞察报告', channel: '微信公众号', date: '2024-07-20' },
-  { title: '品牌故事', channel: '微博', date: '2024-07-15' }
-])
+function assetTypeLabel(type) {
+  return ASSET_TYPE_LABEL[type] || type || '未知'
+}
+
+function resolveYearMonth() {
+  let year = null
+  let month = null
+  if (filterYear.value) {
+    const y = parseInt(String(filterYear.value).slice(0, 4), 10)
+    if (!Number.isNaN(y)) year = y
+  }
+  if (filterMonth.value) {
+    const parts = String(filterMonth.value).split('-')
+    if (parts.length >= 2) {
+      const m = parseInt(parts[1], 10)
+      if (!Number.isNaN(m)) month = m
+    }
+  }
+  return { year, month }
+}
+
+async function loadStatistics() {
+  try {
+    const res = await getAssetOverview()
+    const data = res.data || {}
+    stats.totalAssets = data.totalAssets || 0
+    stats.published = data.published || 0
+    stats.screenshots = data.screenshots || 0
+  } catch {
+    stats.totalAssets = 0
+    stats.published = 0
+  }
+}
+
+function toTimelineItem(it) {
+  const status = it.status
+  return {
+    id: it.id,
+    assetType: it.assetType,
+    title: it.title,
+    description: it.description || '',
+    date: it.date || '-',
+    type: status === 2 ? 'success' : status === 3 ? 'danger' : 'primary',
+    typeLabel: assetTypeLabel(it.assetType),
+    status: it.statusText || '未知',
+    brandName: it.brandName,
+    brandId: it.brandId,
+    showDetail: false
+  }
+}
+
+async function loadTimeline() {
+  try {
+    const { year, month } = resolveYearMonth()
+    const res = await getAssetList({ pageNum: 1, pageSize: 50, year, month })
+    const list = res.data || []
+    timeline.value = list.map(toTimelineItem)
+  } catch {
+    timeline.value = []
+  }
+}
+
+async function loadArchive() {
+  try {
+    const { year, month } = resolveYearMonth()
+    const res = await getAssetList({ assetType: 'content', pageNum: 1, pageSize: 50, year, month })
+    const list = res.data || []
+    archiveList.value = list.map((it) => ({
+      id: it.id,
+      title: it.title,
+      type: (it.extra && it.extra.contentType) || assetTypeLabel(it.assetType),
+      date: it.date || ''
+    }))
+  } catch {
+    archiveList.value = []
+  }
+}
+
+async function loadPublishRecords() {
+  try {
+    const { year, month } = resolveYearMonth()
+    const res = await getAssetList({ assetType: 'distribute', status: 2, pageNum: 1, pageSize: 50, year, month })
+    const list = res.data || []
+    publishRecords.value = list.map((it) => ({
+      id: it.id,
+      title: it.title,
+      channel: (it.extra && it.extra.targetPlatform) || '-',
+      date: (it.extra && it.extra.publishTime) || it.date || ''
+    }))
+  } catch {
+    publishRecords.value = []
+  }
+}
+
+function downloadAsset(row) {
+  ElMessage.info(`导出接口待接入：${row.title}`)
+}
 
 function toggleTimelineDetail(item) {
   item.showDetail = !item.showDetail
 }
 
-function handleFilter() {
-  ElMessage.success('过滤完成')
+function loadAll() {
+  pageLoading.value = true
+  Promise.all([loadStatistics(), loadTimeline(), loadArchive(), loadPublishRecords()])
+    .finally(() => { pageLoading.value = false })
 }
 
-function handleUploadChange(file) {
-  // preview handled by upload component
-}
-
-function handleUpload() {
-  showUpload.value = false
-  stats.screenshots++
-  ElMessage.success('截图上传成功')
-}
-
-function viewScreenshot() {
-  showScreenshot.value = true
-}
-
-onMounted(() => {})
+onMounted(() => {
+  loadAll()
+})
 </script>
 
 <style scoped>
@@ -246,20 +293,5 @@ onMounted(() => {})
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-.upload-icon { margin-bottom: 8px; }
-.upload-text {
-  font-size: 14px;
-  color: #606266;
-}
-.screenshot-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px;
-  background: #f5f7fa;
-  border-radius: 8px;
-  color: #c0c4cc;
 }
 </style>

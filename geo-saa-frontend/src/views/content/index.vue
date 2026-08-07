@@ -87,14 +87,14 @@
       >
         <el-table-column type="selection" width="45" />
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="type" label="类型" width="100">
-          <template #default="{ row }">{{ row.type === 'article' ? '文章' : '短视频脚本' }}</template>
+        <el-table-column prop="contentType" label="类型" width="100">
+          <template #default="{ row }">{{ row.contentType === 'article' ? '文章' : '短视频脚本' }}</template>
         </el-table-column>
-        <el-table-column prop="industry" label="行业标签" width="100" />
+        <el-table-column prop="brandName" label="品牌/行业" min-width="100" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'completed' ? 'success' : row.status === 'failed' ? 'danger' : 'warning'">
-              {{ row.status === 'completed' ? '已完成' : row.status === 'failed' ? '失败' : '生成中' }}
+            <el-tag :type="row.status === 2 ? 'success' : row.status === 3 ? 'danger' : 'warning'">
+              {{ contentStatusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -104,7 +104,7 @@
             <el-button size="small" type="primary" link @click="viewContent(row)">查看</el-button>
             <el-button size="small" type="primary" link @click="editContent(row)">编辑</el-button>
             <el-button size="small" type="primary" link @click="exportSingle(row)">导出</el-button>
-            <el-popconfirm title="确认删除？" @confirm="deleteContent(row)">
+            <el-popconfirm title="确认删除？" @confirm="handleDeleteContent(row)">
               <template #reference>
                 <el-button size="small" type="danger" link>删除</el-button>
               </template>
@@ -119,21 +119,54 @@
           :total="total"
           layout="prev, pager, next"
           small
+          @current-change="loadList"
         />
       </div>
     </el-card>
 
     <el-dialog v-model="showDetailDialog" title="内容详情" width="700px">
-      <h3 style="margin:0 0 12px">{{ currentContent.title }}</h3>
-      <el-tag size="small" style="margin-bottom:12px">{{ currentContent.industry }}</el-tag>
-      <el-divider />
-      <div class="content-body">{{ currentContent.body || '暂无正文内容' }}</div>
-      <div class="content-keywords" v-if="currentContent.keywords">
-        <el-divider>关键词</el-divider>
-        <el-tag v-for="kw in currentContent.keywords.split(',')" :key="kw" size="small" style="margin-right:6px">{{ kw }}</el-tag>
-      </div>
+      <template v-if="currentContent">
+        <h3 style="margin:0 0 12px">{{ currentContent.title }}</h3>
+        <el-tag size="small" style="margin-bottom:12px">{{ currentContent.brandName }}</el-tag>
+        <el-divider />
+        <div class="content-body">{{ currentContent.content || '暂无正文内容' }}</div>
+        <div class="content-keywords" v-if="currentContent.keywords">
+          <el-divider>关键词</el-divider>
+          <el-tag v-for="kw in String(currentContent.keywords).split(',')" :key="kw" size="small" style="margin-right:6px">{{ kw }}</el-tag>
+        </div>
+      </template>
       <template #footer>
         <el-button type="primary" @click="showDetailDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showEditDialog" title="编辑内容" width="700px">
+      <el-form :model="editForm" label-width="90px">
+        <el-form-item label="标题">
+          <el-input v-model="editForm.title" />
+        </el-form-item>
+        <el-form-item label="内容类型">
+          <el-select v-model="editForm.contentType" style="width:100%">
+            <el-option label="文章" value="article" />
+            <el-option label="短视频脚本" value="script" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="品牌">
+          <el-input v-model="editForm.brandName" />
+        </el-form-item>
+        <el-form-item label="关键词">
+          <el-input v-model="editForm.keywords" placeholder="逗号分隔" />
+        </el-form-item>
+        <el-form-item label="摘要">
+          <el-input v-model="editForm.summary" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="正文">
+          <el-input v-model="editForm.content" type="textarea" :rows="6" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveEdit">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -141,18 +174,27 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus/es/components/message/index.mjs'
+import {
+  getContentList,
+  getContentDetail,
+  deleteContent,
+  updateContent,
+  batchGenerate,
+  batchGenerateScripts
+} from '@/api/content'
 
 const pageLoading = ref(false)
 const listLoading = ref(false)
 const generating = ref(false)
 const generateProgress = ref(0)
 const page = ref(1)
-const total = ref(5)
+const total = ref(0)
 const showDetailDialog = ref(false)
+const showEditDialog = ref(false)
+const saving = ref(false)
 const selectAll = ref(false)
 const selectedIds = ref([])
-
 const generateFormRef = ref(null)
 
 const generateForm = reactive({
@@ -163,20 +205,37 @@ const generateForm = reactive({
   count: 5
 })
 
-const currentContent = reactive({
+const currentContent = ref(null)
+const editForm = reactive({
+  id: null,
   title: '',
-  industry: '',
-  body: '',
-  keywords: ''
+  contentType: 'article',
+  brandName: '',
+  keywords: '',
+  summary: '',
+  content: ''
 })
 
-const contentList = ref([
-  { id: 1, title: 'AI驱动品牌增长新范式', type: 'article', industry: '科技', status: 'completed', createdAt: '2024-07-28 10:30', body: '本文探讨了AI技术如何驱动品牌在数字化时代实现增长...', keywords: 'AI,品牌增长,数字化' },
-  { id: 2, title: '智能内容创作白皮书', type: 'article', industry: '科技', status: 'completed', createdAt: '2024-07-27 14:20', body: '白皮书详细介绍了智能内容创作的方法论...', keywords: '内容创作,AI,白皮书' },
-  { id: 3, title: 'XX品牌数字化升级案例', type: 'script', industry: '金融', status: 'generating', createdAt: '2024-07-26 16:00', body: '', keywords: '数字化,案例,金融' },
-  { id: 4, title: '医疗AI应用场景分析', type: 'article', industry: '医疗', status: 'failed', createdAt: '2024-07-25 09:00', body: '医疗AI的应用场景分析...', keywords: '医疗,AI,应用场景' },
-  { id: 5, title: '教育行业AI解决方案', type: 'article', industry: '教育', status: 'completed', createdAt: '2024-07-24 11:00', body: 'AI技术在教育行业的解决方案...', keywords: '教育,AI,解决方案' }
-])
+const contentList = ref([])
+
+const CONTENT_STATUS = { 0: '待生成', 1: '生成中', 2: '已完成', 3: '失败' }
+function contentStatusText(status) {
+  return CONTENT_STATUS[status] || '未知'
+}
+
+async function loadList() {
+  listLoading.value = true
+  try {
+    const res = await getContentList({ pageNum: page.value, pageSize: 10 })
+    contentList.value = res.data || []
+    total.value = res.total || 0
+  } catch {
+    contentList.value = []
+    total.value = 0
+  } finally {
+    listLoading.value = false
+  }
+}
 
 function handleGenerate() {
   if (!generateForm.template || !generateForm.direction) {
@@ -184,71 +243,108 @@ function handleGenerate() {
     return
   }
   generating.value = true
-  generateProgress.value = 0
-  const timer = setInterval(() => {
-    generateProgress.value += Math.floor(Math.random() * 15) + 5
-    if (generateProgress.value >= 100) {
+  generateProgress.value = 10
+  const requests = []
+  for (let i = 0; i < generateForm.count; i++) {
+    requests.push({
+      title: `${generateForm.direction}-${i + 1}`,
+      contentType: generateForm.contentType,
+      brandName: generateForm.template,
+      keywords: generateForm.keywords
+    })
+  }
+  const apiCall = generateForm.contentType === 'script'
+    ? batchGenerateScripts(requests)
+    : batchGenerate(requests)
+  apiCall
+    .then((res) => {
       generateProgress.value = 100
-      clearInterval(timer)
-      setTimeout(() => {
-        generating.value = false
-        for (let i = 0; i < generateForm.count; i++) {
-          contentList.value.unshift({
-            id: Date.now() + i,
-            title: `${generateForm.direction}内容${i + 1}`,
-            type: generateForm.contentType,
-            industry: generateForm.template,
-            status: 'completed',
-            createdAt: new Date().toLocaleString(),
-            body: `这是${generateForm.template}行业关于${generateForm.direction}的自动生成内容...`,
-            keywords: generateForm.keywords
-          })
-        }
-        total.value = contentList.value.length
-        ElMessage.success(`已生成 ${generateForm.count} 篇内容`)
-      }, 500)
-    }
-  }, 300)
+      const ids = res.data || []
+      ElMessage.success(`已提交 ${ids.length || requests.length} 篇内容生成任务`)
+      loadList()
+    })
+    .catch(() => {})
+    .finally(() => {
+      generating.value = false
+    })
 }
 
 function handleSelectionChange(selection) {
-  selectedIds.value = selection.map(item => item.id)
+  selectedIds.value = selection.map((item) => item.id)
 }
 
 function handleSelectAll(val) {
-  // handled by table selection
+  // 由表格 selection 自动处理
 }
 
 function handleExport(format) {
-  ElMessage.success(`正在导出 ${selectedIds.value.length} 项内容为 ${format.toUpperCase()} 格式`)
+  ElMessage.info(`导出 ${selectedIds.value.length} 项内容为 ${format.toUpperCase()}（后端导出接口待接入）`)
 }
 
 function exportSingle(row) {
-  ElMessage.success(`正在导出: ${row.title}`)
+  ElMessage.info(`导出: ${row.title}（后端导出接口待接入）`)
 }
 
-function viewContent(row) {
-  currentContent.title = row.title
-  currentContent.industry = row.industry
-  currentContent.body = row.body || '暂无正文内容'
-  currentContent.keywords = row.keywords || ''
-  showDetailDialog.value = true
-}
-
-function editContent(row) {
-  ElMessage.info('编辑功能开发中: ' + row.title)
-}
-
-function deleteContent(row) {
-  const idx = contentList.value.findIndex(item => item.id === row.id)
-  if (idx > -1) {
-    contentList.value.splice(idx, 1)
-    total.value = contentList.value.length
-    ElMessage.success('已删除')
+async function viewContent(row) {
+  try {
+    const res = await getContentDetail(row.id)
+    currentContent.value = res.data || row
+    showDetailDialog.value = true
+  } catch {
+    currentContent.value = row
+    showDetailDialog.value = true
   }
 }
 
-onMounted(() => {})
+function editContent(row) {
+  editForm.id = row.id
+  editForm.title = row.title || ''
+  editForm.contentType = row.contentType || 'article'
+  editForm.brandName = row.brandName || ''
+  editForm.keywords = row.keywords || ''
+  editForm.summary = row.summary || ''
+  editForm.content = row.content || ''
+  showEditDialog.value = true
+}
+
+function saveEdit() {
+  if (!editForm.title) {
+    ElMessage.warning('标题不能为空')
+    return
+  }
+  saving.value = true
+  updateContent({
+    id: editForm.id,
+    title: editForm.title,
+    contentType: editForm.contentType,
+    brandName: editForm.brandName,
+    keywords: editForm.keywords,
+    summary: editForm.summary,
+    content: editForm.content
+  })
+    .then(() => {
+      ElMessage.success('内容已更新')
+      showEditDialog.value = false
+      loadList()
+    })
+    .catch(() => {})
+    .finally(() => {
+      saving.value = false
+    })
+}
+
+function handleDeleteContent(row) {
+  deleteContent(row.id)
+    .then(() => {
+      ElMessage.success('已删除')
+      loadList()
+    })
+    .catch(() => {})
+}
+
+onMounted(() => {
+  loadList()
+})
 </script>
 
 <style scoped>

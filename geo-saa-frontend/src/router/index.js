@@ -68,6 +68,12 @@ const routes = [
         meta: { title: '模型配置', icon: 'Cpu' }
       }
     ]
+  },
+  // 兜底路由：避免访问未知路径时出现白屏
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    redirect: '/dashboard'
   }
 ]
 
@@ -76,7 +82,11 @@ const router = createRouter({
   routes
 })
 
+const BASE_TITLE = 'GEO-SaaS 全域AI搜索优化平台'
+
 router.beforeEach((to, from, next) => {
+  document.title = to.meta?.title ? `${to.meta.title} - ${BASE_TITLE}` : BASE_TITLE
+
   const token = localStorage.getItem('geo-saa-token')
   if (to.meta.requiresAuth && !token) {
     next({ path: '/login', query: { redirect: to.fullPath } })

@@ -1,6 +1,30 @@
 # GEO-SaaS 全域AI搜索优化平台
 
+<div align="center">
+
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-v1.0.0--beta-blue.svg)](https://github.com/wch887292/geo-saa/releases/tag/v1.0.0-beta)
+[![Java](https://img.shields.io/badge/Java-17-orange.svg)]()
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-brightgreen.svg)]()
+[![Vue](https://img.shields.io/badge/Vue-3-4FC08D.svg)]()
+
+</div>
+
 基于 AI 驱动的全域搜索引擎优化平台，提供品牌诊断、知识库管理、AI内容创作、多渠道分发和数据监测等一站式解决方案。
+
+> **English:** GEO-SaaS is an AI-driven **Generative Engine Optimization (GEO)** platform that helps brands improve visibility across AI search and traditional search engines — covering brand diagnosis, knowledge base, AI content creation, multi-channel distribution, and monitoring in one place. No real AI API key required for a quick trial (built-in simulation mode).
+
+## 📚 文档导航
+
+| 文档 | 说明 |
+|------|------|
+| [架构说明](docs/ARCHITECTURE.md) | 系统架构、模块划分与数据流 |
+| [开发路线图](docs/ROADMAP.md) | 未来规划与社区计划 |
+| [API 文档](APIDOC.md) | 接口清单与字段说明 |
+| [贡献指南](CONTRIBUTING.md) | 如何提 Issue / Pull Request |
+| [行为准则](CODE_OF_CONDUCT.md) | 社区行为公约 |
+| [安全策略](SECURITY.md) | 漏洞报送与安全配置提醒 |
+| [更新日志](CHANGELOG.md) | 版本变更记录 |
 
 ## 技术栈
 
@@ -230,3 +254,11 @@ A: 检查 Vite 代理配置 `vite.config.js`，确保 `target` 指向正确的�
 
 ### Q: 不需要 RabbitMQ
 A: 开发模式下 RabbitMQ 已禁用（`application-dev.yml` 中配置），不影响正常使用。
+
+## 开源许可证
+
+本项目采用 [MIT License](LICENSE) 开源。欢迎通过 [贡献指南](CONTRIBUTING.md) 提交 Issue 与 Pull Request，共建社区。
+
+---
+
+⭐ 如果这个项目对你有帮助，欢迎 Star 与分享！

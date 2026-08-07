@@ -41,7 +41,9 @@ services:
     container_name: geo-saa-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+      # 变量名与 backend 保持一致（原先这里是 RABBITMQ_PASS，后端读的是 RABBITMQ_PASSWORD，
+      # 一旦自定义密码就会两边不一致导致后端连不上 MQ）
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -67,6 +69,13 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
       REDIS_HOST: redis
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      # prod profile 下这两项没有默认值，缺失会导致启动失败（这是刻意的 fail-fast 设计）
+      JWT_SECRET: ${JWT_SECRET:?请先在 .env 中设置 JWT_SECRET，可用 openssl rand -base64 32 生成}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_SIMULATION_ENABLED: ${AI_SIMULATION_ENABLED:-true}
     ports:
       - "8080:8080"
     depends_on:

@@ -68,7 +68,7 @@
         <el-col :span="24">
           <el-card shadow="never" class="gap-card">
             <template #header><span>流量缺口分析</span></template>
-            <p>{{ diagnosisResult.gapAnalysis }}</p>
+            <p>{{ diagnosisResult.gapAnalysis || '暂无缺口分析数据' }}</p>
           </el-card>
         </el-col>
       </el-row>
@@ -76,7 +76,7 @@
         <el-col :span="24">
           <el-card shadow="never">
             <template #header><span>优化建议</span></template>
-            <el-timeline>
+            <el-timeline v-if="diagnosisResult.suggestions.length">
               <el-timeline-item
                 v-for="(item, idx) in diagnosisResult.suggestions"
                 :key="idx"
@@ -86,6 +86,7 @@
                 {{ item.content }}
               </el-timeline-item>
             </el-timeline>
+            <div v-else class="empty-text">暂无优化建议</div>
           </el-card>
         </el-col>
       </el-row>
@@ -96,23 +97,13 @@
         <span>历史诊断记录</span>
       </template>
       <el-table :data="historyList" stripe style="width: 100%" v-loading="historyLoading">
-        <el-table-column prop="brand" label="品牌" width="140" />
-        <el-table-column prop="score" label="评分" width="80">
-          <template #default="{ row }">
-            <el-tag :type="row.score >= 80 ? 'success' : row.score >= 60 ? 'warning' : 'danger'">
-              {{ row.score }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="platforms" label="诊断平台" width="200">
-          <template #default="{ row }">
-            <el-tag v-for="p in row.platforms" :key="p" size="small" style="margin-right:4px">{{ p }}</el-tag>
-          </template>
-        </el-table-column>
+        <el-table-column prop="taskName" label="任务名称" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="brandName" label="品牌" width="140" show-overflow-tooltip />
+        <el-table-column prop="taskType" label="诊断类型" width="160" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'completed' ? 'success' : 'warning'">
-              {{ row.status === 'completed' ? '已完成' : '进行中' }}
+            <el-tag :type="taskStatusTag(row.status)">
+              {{ taskStatusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -130,16 +121,19 @@
           :total="historyTotal"
           layout="prev, pager, next"
           small
+          @current-change="loadHistory"
         />
       </div>
     </el-card>
 
     <el-dialog v-model="showCompetitorDialog" title="竞品对比分析" width="700px">
-      <el-table :data="competitorData" stripe style="width: 100%">
+      <el-table :data="competitorData" stripe style="width: 100%" v-loading="competitorLoading">
         <el-table-column prop="name" label="品牌" width="120" />
         <el-table-column prop="score" label="综合评分" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.score >= 80 ? 'success' : 'warning'">{{ row.score }}</el-tag>
+            <el-tag :type="row.score >= 80 ? 'success' : row.score >= 60 ? 'warning' : 'danger'">
+              {{ row.score }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="coverage" label="关键词覆盖" width="120" />
@@ -154,11 +148,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import BrandScore from '@/components/BrandScore.vue'
 import TrendChart from '@/components/TrendChart.vue'
 import TaskProgress from '@/components/TaskProgress.vue'
+import {
+  createDiagnose,
+  getDiagnoseList,
+  getDiagnoseProgress,
+  getDiagnoseReport
+} from '@/api/diagnose'
 
 const pageLoading = ref(false)
 const formRef = ref(null)
@@ -168,8 +168,10 @@ const showResult = ref(false)
 const progress = ref(0)
 const historyLoading = ref(false)
 const historyPage = ref(1)
-const historyTotal = ref(12)
+const historyTotal = ref(0)
 const showCompetitorDialog = ref(false)
+const competitorLoading = ref(false)
+const diagnoseTimer = ref(null)
 
 const form = reactive({
   brand: '',
@@ -194,35 +196,105 @@ const progressDetail = computed(() => {
 })
 
 const diagnosisResult = reactive({
-  score: 72,
-  scoreLevel: '良好',
-  gapAnalysis: '当前品牌在 AI 平台上的关键词覆盖率为 65%，主要缺口集中在豆包和通用AI平台。建议优先补充产品参数类结构化数据，提升在 AI 搜索中的可见度。',
-  suggestions: [
-    { content: '补充产品核心参数的结构化数据标记（JSON-LD）', type: 'primary', priority: '高优先级' },
-    { content: '在豆包平台增加品牌相关信息发布频率', type: 'warning', priority: '中优先级' },
-    { content: '优化品牌关键词策略，覆盖更多长尾词', type: 'primary', priority: '高优先级' },
-    { content: '建立品牌知识图谱，提升 AI 采信率', type: 'info', priority: '中优先级' }
-  ],
-  platformData: {
-    categories: ['豆包', '千问', 'Kimi', '通用AI'],
-    series: [{
-      name: '采信率',
-      data: [45, 72, 68, 55]
-    }]
-  }
+  score: 0,
+  scoreLevel: '',
+  gapAnalysis: '',
+  suggestions: [],
+  platformData: { categories: [], series: [] }
 })
 
-const historyList = ref([
-  { brand: '品牌A', score: 72, platforms: ['豆包', '千问', 'Kimi', '通用AI'], status: 'completed', createdAt: '2024-07-28 14:30' },
-  { brand: '品牌A', score: 65, platforms: ['豆包', '千问'], status: 'completed', createdAt: '2024-07-21 10:00' },
-  { brand: '品牌A', score: 58, platforms: ['豆包', '千问', 'Kimi'], status: 'completed', createdAt: '2024-07-14 16:20' }
-])
+const historyList = ref([])
+const competitorData = ref([])
 
-const competitorData = ref([
-  { name: '本品牌', score: 72, coverage: '65%', aiAdoption: '60%', gap: '-' },
-  { name: '竞品A', score: 85, coverage: '78%', aiAdoption: '82%', gap: '领先 13 分' },
-  { name: '竞品B', score: 68, coverage: '58%', aiAdoption: '55%', gap: '落后 4 分' }
-])
+const TASK_STATUS = { 0: '待处理', 1: '进行中', 2: '已完成', 3: '失败' }
+function taskStatusText(status) {
+  return TASK_STATUS[status] || '未知'
+}
+function taskStatusTag(status) {
+  return status === 2 ? 'success' : status === 3 ? 'danger' : 'warning'
+}
+
+function buildDiagnosisResult(report) {
+  const inner = report.report || {}
+  const score = typeof inner.score === 'number' ? inner.score : 0
+  diagnosisResult.score = score
+  diagnosisResult.scoreLevel = score >= 80 ? '优秀' : score >= 60 ? '良好' : '待提升'
+
+  const gaps = Array.isArray(inner.gaps) ? inner.gaps : []
+  diagnosisResult.gapAnalysis = gaps.length
+    ? gaps.map((g) => `[${g.title || '缺口'}] ${g.description || ''}`).join('；')
+    : (report.visibility ? `品牌「${report.visibility.brandName || ''}」在${report.visibility.platform || ''}平台的综合评分 ${score}。` : '暂无缺口分析数据')
+
+  const suggestions = Array.isArray(inner.suggestions) ? inner.suggestions : []
+  diagnosisResult.suggestions = suggestions.map((text, i) => ({
+    content: text,
+    type: i % 2 === 0 ? 'primary' : 'warning',
+    priority: i < 2 ? '高优先级' : '中优先级'
+  }))
+
+  const competitor = Array.isArray(report.competitorComparison) ? report.competitorComparison : []
+  diagnosisResult.platformData = {
+    categories: competitor.map((c) => c.name),
+    series: [{
+      name: '综合评分',
+      data: competitor.map((c) => c.score || 0)
+    }]
+  }
+  competitorData.value = competitor.map((c) => ({
+    name: c.name,
+    score: c.score || 0,
+    coverage: c.mentionRate != null ? c.mentionRate + '%' : '-',
+    aiAdoption: c.firstRecommendRate != null ? c.firstRecommendRate + '%' : '-',
+    gap: c.advantage || c.disadvantage || '-'
+  }))
+}
+
+async function loadHistory() {
+  historyLoading.value = true
+  try {
+    const res = await getDiagnoseList({ pageNum: historyPage.value, pageSize: 10 })
+    historyList.value = res.data || []
+    historyTotal.value = res.total || 0
+  } catch {
+    historyList.value = []
+    historyTotal.value = 0
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function fetchReport(taskId) {
+  const res = await getDiagnoseReport(taskId)
+  buildDiagnosisResult(res.data || {})
+  showResult.value = true
+}
+
+function pollProgress(taskId) {
+  progress.value = 0
+  diagnoseTimer.value = setInterval(async () => {
+    try {
+      const res = await getDiagnoseProgress(taskId)
+      const tp = res.data
+      if (tp) {
+        progress.value = tp.percentage || 0
+        if (tp.status === 'completed') {
+          clearInterval(diagnoseTimer.value)
+          diagnoseTimer.value = null
+          diagnosing.value = false
+          ElMessage.success('诊断完成')
+          await fetchReport(taskId)
+        } else if (tp.status === 'failed') {
+          clearInterval(diagnoseTimer.value)
+          diagnoseTimer.value = null
+          diagnosing.value = false
+          ElMessage.error(tp.message || '诊断失败')
+        }
+      }
+    } catch {
+      // 轮询异常（如任务尚未初始化进度），继续下一次
+    }
+  }, 1500)
+}
 
 function handleDiagnose() {
   formRef.value?.validate((valid) => {
@@ -231,18 +303,27 @@ function handleDiagnose() {
     showProgress.value = true
     showResult.value = false
     progress.value = 0
-    const timer = setInterval(() => {
-      progress.value += Math.floor(Math.random() * 12) + 3
-      if (progress.value >= 100) {
-        progress.value = 100
-        clearInterval(timer)
-        setTimeout(() => {
+    const payload = {
+      taskName: form.brand + ' AI 诊断',
+      taskType: form.platforms.join(','),
+      brandName: form.brand,
+      inputParams: form.competitor
+    }
+    createDiagnose(payload)
+      .then((res) => {
+        const task = res.data
+        if (!task || !task.id) {
           diagnosing.value = false
-          showResult.value = true
-          ElMessage.success('诊断完成')
-        }, 500)
-      }
-    }, 400)
+          showProgress.value = false
+          ElMessage.error('创建诊断任务失败')
+          return
+        }
+        pollProgress(task.id)
+      })
+      .catch(() => {
+        diagnosing.value = false
+        showProgress.value = false
+      })
   })
 }
 
@@ -254,10 +335,24 @@ function resetForm() {
 }
 
 function viewReport(row) {
-  ElMessage.info('查看报告详情: ' + row.brand)
+  competitorLoading.value = true
+  fetchReport(row.id)
+    .catch(() => ElMessage.error('获取报告失败'))
+    .finally(() => {
+      competitorLoading.value = false
+    })
 }
 
-onMounted(() => {})
+onBeforeUnmount(() => {
+  if (diagnoseTimer.value) {
+    clearInterval(diagnoseTimer.value)
+    diagnoseTimer.value = null
+  }
+})
+
+onMounted(() => {
+  loadHistory()
+})
 </script>
 
 <style scoped>
@@ -278,6 +373,12 @@ onMounted(() => {})
   line-height: 1.8;
   color: #606266;
   margin: 0;
+}
+.empty-text {
+  text-align: center;
+  color: #c0c4cc;
+  padding: 20px 0;
+  font-size: 14px;
 }
 .pagination-wrap {
   display: flex;

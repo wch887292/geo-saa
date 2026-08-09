@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # GitHub Actions 工作流依赖（含 actions/* 版本）
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # 前端 npm 依赖
+  - package-ecosystem: "npm"
+    directory: "/geo-saa-frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "frontend"
+
+  # 后端 Maven 依赖
+  - package-ecosystem: "maven"
+    directory: "/geo-saa-backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "backend"

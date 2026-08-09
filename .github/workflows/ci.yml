@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------- 后端：Maven 编译（快速失败，捕获编译/类型错误） ----------
+  backend-compile:
+    name: Backend compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Maven compile
+        working-directory: geo-saa-backend
+        run: mvn -B -q compile
+
+  # ---------- 前端：Vite 生产构建 ----------
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: geo-saa-frontend/package.json
+      - name: Install & build
+        working-directory: geo-saa-frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+  # ---------- 端到端冒烟：MySQL + Redis + 后端(dev) + smoke_test.py ----------
+  smoke-test:
+    name: End-to-end smoke test
+    runs-on: ubuntu-latest
+    needs: [backend-compile]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install mysql client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+      - name: Import DB schema & seed data
+        run: mysql -h 127.0.0.1 -u root -proot < geo-saa-backend/src/main/resources/db/init.sql
+      - name: Start backend (dev profile, RabbitMQ disabled)
+        working-directory: geo-saa-backend
+        env:
+          SPRING_PROFILES_ACTIVE: dev
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
+          MYSQL_DATABASE: geo_saa
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          AI_SIMULATION_ENABLED: 'true'
+        run: |
+          nohup mvn -B spring-boot:run > /tmp/backend.log 2>&1 &
+          echo "backend starting (pid $!)"
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/api/v1/system/health >/dev/null 2>&1; then
+              echo "backend healthy after ${i}*2s"; break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8080/api/v1/system/health \
+            || { echo "backend did not come up"; tail -n 60 /tmp/backend.log; exit 1; }
+      - name: Run smoke test (direct to backend)
+        env:
+          SMOKE_BASE: http://127.0.0.1:8080
+        run: python smoke_test.py

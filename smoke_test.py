@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-import json, urllib.request, urllib.parse, urllib.error
+import json, os, urllib.request, urllib.parse, urllib.error
 
-BASE = "http://localhost:3000"  # frontend dev server (proxies /api -> backend:8080)
+# 默认打前端 dev server（:3000，由 Vite 代理 /api -> 后端 :8080）。
+# CI 中设置 SMOKE_BASE=http://127.0.0.1:8080 可直连后端，免去启动前端。
+BASE = os.environ.get("SMOKE_BASE", "http://localhost:3000")
 
 def req(method, path, params=None, token=None, body=None, raw=False):
     url = BASE + path

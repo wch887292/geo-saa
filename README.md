@@ -14,6 +14,26 @@
 
 > **English:** GEO-SaaS is an AI-driven **Generative Engine Optimization (GEO)** platform that helps brands improve visibility across AI search and traditional search engines — covering brand diagnosis, knowledge base, AI content creation, multi-channel distribution, and monitoring in one place. No real AI API key required for a quick trial (built-in simulation mode).
 
+## 🌐 官方站点与关联开源项目
+
+本仓库由 **晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心** 维护，是飞虹智 klAI 开源生态的一部分。
+
+- 🏠 **官方网站**：[https://klai.top](https://klai.top) — 飞虹智 klAI · 泉州制造业 AI 服务商
+- 📦 **开源矩阵**：[https://klai.top/opensource.html](https://klai.top/opensource.html) — 全部开源项目一览
+- 📚 **AI 知识库**：[https://kb.klai.top](https://kb.klai.top) — 产品文档与智能问答（MaxKB 驱动）
+
+**关联项目**：
+
+| 项目 | 简介 |
+|------|------|
+| [GEO-SaaS](https://github.com/wch887292/geo-saa) | AI 驱动的全域 GEO 搜索优化平台（本仓库） |
+| [飞虹智·企业AI平台](https://github.com/wch887292/fyqy-ai-agent) | 中小制造企业 AI 原生一体化管理平台 |
+| [FyqyClaw](https://github.com/wch887292/FyqyClaw) | 全流程 AI 驱动开发工具（IDE + AI Agent） |
+| [星眠AI](https://github.com/wch887292/xmai) | 睡眠健康管理微信小程序 + 私有部署后端 |
+
+> ⭐ 如果这个项目对你有帮助，欢迎 **Star** 并分享，让更多人发现飞虹智开源生态！
+
+
 ## 📚 文档导航
 
 | 文档 | 说明 |

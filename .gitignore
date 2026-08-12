@@ -65,3 +65,7 @@ geo-saa-frontend/vite.config.js.timestamp-*.mjs
 # 发布/工具压缩包（release artifact，非源码）
 *.zip
 tooling/
+
+# Python 缓存（py_compile 等产生，非源码）
+__pycache__/
+*.pyc

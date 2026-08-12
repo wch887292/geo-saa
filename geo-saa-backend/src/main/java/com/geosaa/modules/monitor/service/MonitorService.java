@@ -6,6 +6,7 @@ import com.geosaa.modules.monitor.entity.DataMonitorStat;
 import com.geosaa.modules.monitor.mapper.DataMonitorStatMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,9 @@ public class MonitorService {
 
     private final DataMonitorStatMapper monitorStatMapper;
     private final RedisTemplate<String, Object> redisTemplate;
+
+    @Value("${ai.simulation.enabled:true}")
+    private boolean simulationEnabled;
 
     public Page<DataMonitorStat> listStats(int pageNum, int pageSize, String statType, LocalDate startDate, LocalDate endDate) {
         LambdaQueryWrapper<DataMonitorStat> wrapper = new LambdaQueryWrapper<>();
@@ -79,7 +83,8 @@ public class MonitorService {
         }
         mentionWrapper.orderByDesc(DataMonitorStat::getStatDate).last("LIMIT 1");
         DataMonitorStat mentionStat = monitorStatMapper.selectOne(mentionWrapper);
-        metrics.put("mentionRate", mentionStat != null ? mentionStat.getStatValue() : Math.round(Math.random() * 100));
+        metrics.put("mentionRate", mentionStat != null ? mentionStat.getStatValue()
+                : (simulationEnabled ? Math.round(Math.random() * 100) : 0L));
 
         // 首推占比
         LambdaQueryWrapper<DataMonitorStat> recommendWrapper = new LambdaQueryWrapper<>();
@@ -89,7 +94,8 @@ public class MonitorService {
         }
         recommendWrapper.orderByDesc(DataMonitorStat::getStatDate).last("LIMIT 1");
         DataMonitorStat recommendStat = monitorStatMapper.selectOne(recommendWrapper);
-        metrics.put("firstRecommendRate", recommendStat != null ? recommendStat.getStatValue() : Math.round(Math.random() * 100));
+        metrics.put("firstRecommendRate", recommendStat != null ? recommendStat.getStatValue()
+                : (simulationEnabled ? Math.round(Math.random() * 100) : 0L));
 
         // 收录量
         LambdaQueryWrapper<DataMonitorStat> collectWrapper = new LambdaQueryWrapper<>();
@@ -99,7 +105,8 @@ public class MonitorService {
         }
         collectWrapper.orderByDesc(DataMonitorStat::getStatDate).last("LIMIT 1");
         DataMonitorStat collectStat = monitorStatMapper.selectOne(collectWrapper);
-        metrics.put("collectionCount", collectStat != null ? collectStat.getStatValue() : new Random().nextInt(1000));
+        metrics.put("collectionCount", collectStat != null ? collectStat.getStatValue()
+                : (simulationEnabled ? new Random().nextInt(1000) : 0L));
 
         // 综合评分：metrics 中存放的是装箱数值（Long/Integer），直接 (double)/(long) 强转
         // 会在运行时触发 ClassCastException（Long/Integer 不能强转为 Double/Long）。
@@ -111,6 +118,13 @@ public class MonitorService {
                 + firstRecommendRate * 0.35
                 + Math.min(100, collectionCount / 10) * 0.25);
         metrics.put("score", Math.min(100, score));
+
+        boolean hasRealData = mentionStat != null && recommendStat != null && collectStat != null;
+        metrics.put("simulated", !hasRealData && simulationEnabled);
+        metrics.put("hasData", hasRealData);
+        if (!hasRealData && !simulationEnabled) {
+            log.warn("监测数据缺失且模拟模式已关闭，返回空数据 brandName={}", brandName);
+        }
 
         // 缓存 5 分钟
         redisTemplate.opsForValue().set(cacheKey, metrics, CACHE_TTL_MINUTES, TimeUnit.MINUTES);
@@ -213,10 +227,11 @@ public class MonitorService {
         for (String competitor : competitorsList) {
             Map<String, Object> comp = new HashMap<>();
             comp.put("name", competitor);
-            comp.put("mentionRate", Math.round(Math.random() * 100));
-            comp.put("firstRecommendRate", Math.round(Math.random() * 100));
-            comp.put("collectionCount", new Random().nextInt(1000));
-            comp.put("trend", Math.random() > 0.5 ? "up" : "down");
+            comp.put("mentionRate", simulationEnabled ? Math.round(Math.random() * 100) : 0L);
+            comp.put("firstRecommendRate", simulationEnabled ? Math.round(Math.random() * 100) : 0L);
+            comp.put("collectionCount", simulationEnabled ? new Random().nextInt(1000) : 0L);
+            comp.put("trend", simulationEnabled ? (Math.random() > 0.5 ? "up" : "down") : "flat");
+            comp.put("simulated", simulationEnabled);
             competitors.add(comp);
         }
 
@@ -237,7 +252,7 @@ public class MonitorService {
         wrapper.orderByDesc(DataMonitorStat::getStatDate).last("LIMIT 7");
         List<DataMonitorStat> stats = monitorStatMapper.selectList(wrapper);
         if (stats.isEmpty()) {
-            return Math.round(Math.random() * 100);
+            return simulationEnabled ? Math.round(Math.random() * 100) : 0L;
         }
         return Math.round(stats.stream().mapToLong(DataMonitorStat::getStatValue).average().orElse(0));
     }

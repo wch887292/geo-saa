@@ -262,3 +262,25 @@ INSERT INTO system_config (config_key, config_value, config_desc, config_group, 
 ('tongyiApiKey', '', '通义千问 API Key', 'ai_model', 1),
 ('doubaoApiKey', '', '豆包 API Key', 'ai_model', 1),
 ('simulationEnabled', 'true', '模拟模式开关', 'ai_model', 1);
+
+-- ----------------------------
+-- 12. 资产存证记录表 (O7: asset 独立数据模型)
+-- 资产视图不再仅靠 content/knowledge/distribute/diagnose 四表内存聚合兜底，
+-- 本表提供独立的数据模型；未写入记录时相关接口返回空，不产生虚假数据。
+-- ----------------------------
+DROP TABLE IF EXISTS asset_record;
+CREATE TABLE asset_record (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    asset_key   VARCHAR(128) NOT NULL COMMENT '资产唯一键',
+    asset_name  VARCHAR(256) NOT NULL COMMENT '资产名称',
+    asset_type  VARCHAR(64)  DEFAULT 'record' COMMENT '资产类型',
+    brand_name  VARCHAR(128) DEFAULT NULL COMMENT '所属品牌',
+    status      TINYINT      DEFAULT 1 COMMENT '状态: 0=失效, 1=有效',
+    stat_value  BIGINT       DEFAULT 0 COMMENT '统计值',
+    source      VARCHAR(256) DEFAULT NULL COMMENT '来源',
+    remark      VARCHAR(512) DEFAULT NULL COMMENT '备注',
+    create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted     TINYINT      DEFAULT 0 COMMENT '逻辑删除: 0=未删除, 1=已删除',
+    UNIQUE KEY uk_asset_key (asset_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='资产存证记录表';

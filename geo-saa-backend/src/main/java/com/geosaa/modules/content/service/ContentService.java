@@ -8,6 +8,8 @@ import com.geosaa.common.exception.BusinessException;
 import com.geosaa.config.RabbitMqConfig;
 import com.geosaa.modules.content.dto.ContentGenerateRequest;
 import com.geosaa.modules.content.entity.AiArticleContent;
+import com.geosaa.modules.content.geo.GeoValidationResult;
+import com.geosaa.modules.content.geo.GeoContentValidator;
 import com.geosaa.modules.content.mapper.AiArticleContentMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,6 +31,7 @@ public class ContentService {
 
     private final AiArticleContentMapper articleContentMapper;
     private final AiAdapterFactory aiAdapterFactory;
+    private final GeoContentValidator geoContentValidator;
     @Autowired(required = false)
     private RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
@@ -82,6 +85,14 @@ public class ContentService {
         if (complianceResult != null) {
             throw new BusinessException("内容合规检测未通过: " + complianceResult);
         }
+
+        // GEO 九战术校验：关键词堆砌直接拦截（论文实测可见度 −8%~−10%）
+        GeoValidationResult geoResult = validateGeo(request.getContent(), request.getKeywords());
+        if (geoResult.isBlocked()) {
+            throw new BusinessException("内容 GEO 校验未通过（关键词堆砌）："
+                    + geoResult.getRedFlags().stream().findFirst().orElse("密度超阈值"));
+        }
+        log.debug("内容 GEO 校验通过: score={}, blocked={}", geoResult.getTotalScore(), geoResult.isBlocked());
 
         AiArticleContent content = new AiArticleContent();
         content.setTitle(request.getTitle());
@@ -236,6 +247,13 @@ public class ContentService {
     }
 
     /**
+     * GEO 九战术内容健康度校验（透传校验器，供控制器与内部流程共用）。
+     */
+    public GeoValidationResult validateGeo(String content, String keywords) {
+        return geoContentValidator.validate(content, keywords);
+    }
+
+    /**
      * AI 生成单篇内容（同步）
      */
     public AiArticleContent generateWithAi(Long contentId) {
@@ -270,6 +288,13 @@ public class ContentService {
 
             content.setStatus(Constant.TASK_STATUS_COMPLETED); // 已完成
             articleContentMapper.updateById(content);
+
+            // 生成结果 GEO 校验：堆砌只告警不拦（避免打断生成链路），人工介入优化
+            if (content.getContent() != null && !content.getContent().isBlank()) {
+                GeoValidationResult geo = validateGeo(content.getContent(), content.getKeywords());
+                log.info("AI 生成内容 GEO 校验: contentId={}, score={}, blocked={}, redFlags={}",
+                        contentId, geo.getTotalScore(), geo.isBlocked(), geo.getRedFlags());
+            }
         } catch (Exception e) {
             log.error("AI生成内容失败: contentId={}", contentId, e);
             content.setStatus(Constant.TASK_STATUS_FAILED); // 失败

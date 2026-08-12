@@ -137,4 +137,16 @@ public class ContentController {
         }
         return Result.error(400, result);
     }
+
+    /**
+     * GEO 九战术内容健康度校验（Princeton KDD 2024 九大战术）。
+     * 关键词堆砌密度超阈值时 {@code blocked=true}。
+     */
+    @PostMapping("/geo-validate")
+    public Result<com.geosaa.modules.content.geo.GeoValidationResult> geoValidate(
+            @RequestBody Map<String, String> request) {
+        com.geosaa.modules.content.geo.GeoValidationResult result =
+                contentService.validateGeo(request.get("content"), request.get("keywords"));
+        return Result.success(result);
+    }
 }

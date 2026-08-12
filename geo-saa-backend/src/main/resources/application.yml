@@ -79,3 +79,27 @@ ai:
     api-url: ${DOUBAO_API_URL:}
   simulation:
     enabled: ${AI_SIMULATION_ENABLED:true}  # 模拟模式，无 API Key 时返回模拟数据
+
+# GEO 真实数据采集器（G-01）
+# 默认全部关闭：显式置 enabled=true 并至少启用一个引擎 + 填入 API Key 才生效。
+# 未配置时定时任务不注册、不产生任何外部调用，也绝不写入模拟数据。
+app:
+  geo:
+    collector:
+      enabled: ${GEO_COLLECTOR_ENABLED:false}
+      cron: "0 30 1 * * *"
+      brands: ${GEO_COLLECTOR_BRANDS:}
+      probes-per-brand: ${GEO_COLLECTOR_PROBES:3}
+      query-template: "请介绍一下品牌「{brand}」的产品或服务，并结合公开信息给出你的推荐意见。"
+      timeout-seconds: ${GEO_COLLECTOR_TIMEOUT:20}
+      perplexity:
+        enabled: ${GEO_PERPLEXITY_ENABLED:false}
+        api-key: ${GEO_PERPLEXITY_API_KEY:}
+        api-url: ${GEO_PERPLEXITY_API_URL:https://api.perplexity.ai/chat/completions}
+        model: ${GEO_PERPLEXITY_MODEL:sonar}
+      openai-compat:
+        enabled: ${GEO_OPENAI_COMPAT_ENABLED:false}
+        api-key: ${GEO_OPENAI_COMPAT_API_KEY:}
+        api-url: ${GEO_OPENAI_COMPAT_API_URL:}
+        model: ${GEO_OPENAI_COMPAT_MODEL:}
+

@@ -128,6 +128,19 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <!--
+              Windows 下项目路径含空格（如 H:\geo saa）时，JDK 17 的
+              URLClassPath 安全校验（JDK-8231279）会拒绝加载 manifest-jar 中的
+              绝对路径 classpath，导致 Mockito MockMaker 初始化失败。
+              本开关仅绕过该校验，对 CI（无空格路径）无副作用。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

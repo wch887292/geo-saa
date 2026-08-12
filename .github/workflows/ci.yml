@@ -38,11 +38,11 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: geo-saa-frontend/package.json
-      - name: Install & build
+          cache-dependency-path: geo-saa-frontend/package-lock.json
+      - name: Install & build (lockfile-pinned)
         working-directory: geo-saa-frontend
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run build
 
   # ---------- 端到端冒烟：MySQL + Redis + 后端(dev) + smoke_test.py ----------

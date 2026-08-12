@@ -3,6 +3,8 @@ package com.geosaa.modules.asset;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.geosaa.common.Constant;
 import com.geosaa.common.PageResult;
+import com.geosaa.modules.asset.entity.AssetRecord;
+import com.geosaa.modules.asset.mapper.AssetRecordMapper;
 import com.geosaa.modules.content.entity.AiArticleContent;
 import com.geosaa.modules.content.mapper.AiArticleContentMapper;
 import com.geosaa.modules.diagnose.entity.AiDiagnoseTask;
@@ -39,6 +41,7 @@ public class AssetService {
     private final DistributeTaskMapper distributeTaskMapper;
     private final BrandKnowledgeMapper knowledgeMapper;
     private final AiDiagnoseTaskMapper diagnoseTaskMapper;
+    private final AssetRecordMapper assetRecordMapper;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final int MAX_PER_SOURCE = 500;
@@ -65,12 +68,15 @@ public class AssetService {
         long distributeTotal = safeCount(distributeTaskMapper.selectCount(null));
         long distributeSuccess = safeDistributeSuccess();
         long diagnoseTotal = safeCount(diagnoseTaskMapper.selectCount(null));
+        long recordedTotal = safeRecordedCount();
 
         result.put("contentTotal", contentTotal);
         result.put("knowledgeTotal", knowledgeTotal);
         result.put("distributeTotal", distributeTotal);
         result.put("distributeSuccess", distributeSuccess);
         result.put("diagnoseTotal", diagnoseTotal);
+        // 独立存证模型：asset_record 表中的真实记录数
+        result.put("recordedAssets", recordedTotal);
         // 资产存证视角：内容与知识是核心品牌资产
         result.put("totalAssets", contentTotal + knowledgeTotal);
         result.put("published", distributeSuccess);
@@ -81,6 +87,7 @@ public class AssetService {
         byType.put("knowledge", knowledgeTotal);
         byType.put("distribute", distributeTotal);
         byType.put("diagnose", diagnoseTotal);
+        byType.put("record", recordedTotal);
         result.put("byType", byType);
         return result;
     }
@@ -99,6 +106,9 @@ public class AssetService {
         }
         if (assetType == null || assetType.isEmpty() || "diagnose".equals(assetType)) {
             all.addAll(safeDiagnoseAssets());
+        }
+        if (assetType == null || assetType.isEmpty() || "record".equals(assetType)) {
+            all.addAll(safeRecordAssets());
         }
 
         // 按日期倒序（空日期排最后）
@@ -248,8 +258,52 @@ public class AssetService {
         }
     }
 
+    private List<Map<String, Object>> safeRecordAssets() {
+        try {
+            LambdaQueryWrapper<AssetRecord> wrapper = new LambdaQueryWrapper<>();
+            wrapper.orderByDesc(AssetRecord::getCreateTime).last("LIMIT " + MAX_PER_SOURCE);
+            List<AssetRecord> list = assetRecordMapper.selectList(wrapper);
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (AssetRecord r : list) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", r.getId());
+                m.put("assetType", "record");
+                m.put("title", r.getAssetName());
+                m.put("description", firstNonBlank(r.getRemark(), r.getAssetKey()));
+                m.put("date", fmt(r.getCreateTime()));
+                m.put("status", r.getStatus());
+                m.put("statusText", r.getStatus() != null && r.getStatus() == 1 ? "有效" : "失效");
+                m.put("typeLabel", firstNonBlank(r.getAssetType(), "存证"));
+                m.put("brandName", r.getBrandName());
+                Map<String, Object> extra = new LinkedHashMap<>();
+                extra.put("assetKey", r.getAssetKey());
+                extra.put("statValue", r.getStatValue());
+                extra.put("source", r.getSource());
+                m.put("extra", extra);
+                items.add(m);
+            }
+            return items;
+        } catch (Exception e) {
+            log.warn("资产-存证记录聚合失败: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
     private long safeCount(Long count) {
         return count == null ? 0L : count;
+    }
+
+    /**
+     * 独立存证模型计数：asset_record 表尚未初始化（老库未执行新 init.sql）时
+     * 降级为 0，避免 overview 接口整体 500。
+     */
+    private long safeRecordedCount() {
+        try {
+            return safeCount(assetRecordMapper.selectCount(null));
+        } catch (Exception e) {
+            log.warn("资产-存证记录数查询失败（表未初始化？）: {}", e.getMessage());
+            return 0L;
+        }
     }
 
     private long safeDistributeSuccess() {

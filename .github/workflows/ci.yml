@@ -11,9 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ---------- 后端：Maven 编译（快速失败，捕获编译/类型错误） ----------
+  # ---------- 后端：Maven 编译 + 单元测试（快速失败，捕获编译/逻辑错误） ----------
   backend-compile:
-    name: Backend compile
+    name: Backend compile & unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,9 +23,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
-      - name: Maven compile
+      - name: Maven compile & test
         working-directory: geo-saa-backend
-        run: mvn -B -q compile
+        # 单测为纯 Mockito（无 Spring 上下文/DB 依赖），覆盖评分公式 /
+        # simulation 闸门 / 九战术校验 / 指标聚合，全部通过才允许合并
+        run: mvn -B test
 
   # ---------- 前端：Vite 生产构建 ----------
   frontend-build:

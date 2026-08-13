@@ -10,8 +10,10 @@ import com.geosaa.modules.diagnose.entity.AiDiagnoseTask;
 import com.geosaa.modules.diagnose.mapper.AiDiagnoseTaskMapper;
 import com.geosaa.modules.distribute.entity.DistributeTask;
 import com.geosaa.modules.distribute.mapper.DistributeTaskMapper;
+import com.geosaa.modules.knowledge.mapper.BrandKnowledgeMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -33,8 +35,15 @@ public class StatisticsService {
     private final AiDiagnoseTaskMapper diagnoseTaskMapper;
     private final AiArticleContentMapper contentMapper;
     private final DistributeTaskMapper distributeTaskMapper;
+    private final BrandKnowledgeMapper knowledgeMapper;
     private final TaskProgressService taskProgressService;
     private final ObjectMapper objectMapper;
+
+    @Value("${ai.simulation.enabled:true}")
+    private boolean simulationEnabled;
+
+    @Value("${app.geo.collector.enabled:false}")
+    private boolean collectorEnabled;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MM-dd");
 
@@ -50,11 +59,52 @@ public class StatisticsService {
         result.put("rank", null);
         result.put("rankChange", null);
         result.put("trendData", safeVisibilityTrend());
-        result.put("todos", Collections.emptyList());   // 暂无待办数据源
+        result.put("todos", buildTodos());
         result.put("runningTasks", safeRunningTasks());
         result.put("recentReports", safeRecentReports());
 
         return result;
+    }
+
+    /**
+     * 基于真实业务数据与配置状态生成首页待办（T4：替代恒空占位）。
+     *
+     * <p>每项结构 {@code {text, done, type, action}}，与前端 dashboard 待办卡片兼容；
+     * 全部满足时给一条正向提示，避免空态。
+     */
+    private List<Map<String, Object>> buildTodos() {
+        List<Map<String, Object>> todos = new ArrayList<>();
+        long contentTotal = safeCount(contentMapper.selectCount(null));
+        long knowledgeTotal = safeCount(knowledgeMapper.selectCount(null));
+        long distributeSuccess = safeDistributeSuccess();
+
+        if (knowledgeTotal == 0) {
+            todos.add(todo("完善品牌知识库（核心关键词 / 产品优势 / 权威数据）", "knowledge"));
+        }
+        if (contentTotal == 0) {
+            todos.add(todo("创建首批 AI 内容，为 GEO 引擎提供可引用的信源", "content"));
+        }
+        if (contentTotal > 0 && distributeSuccess == 0) {
+            todos.add(todo("将已生成内容加入多渠道分发，扩大曝光", "distribute"));
+        }
+        if (simulationEnabled) {
+            todos.add(todo("配置真实 AI API Key 并关闭模拟模式，获取真实诊断与采集数据", "system"));
+        }
+        if (!collectorEnabled) {
+            todos.add(todo("启用 GEO 真实数据采集器（GEO_COLLECTOR_ENABLED=true），让监测指标可追溯", "monitor"));
+        }
+        if (todos.isEmpty()) {
+            todos.add(todo("系统运行良好，保持内容产出与监测节奏", "done"));
+        }
+        return todos;
+    }
+
+    private Map<String, Object> todo(String text, String type) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("text", text);
+        item.put("done", false);
+        item.put("type", type);
+        return item;
     }
 
     private Integer safeVisibilityScore() {

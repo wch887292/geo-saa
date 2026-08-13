@@ -3,6 +3,7 @@ package com.geosaa.modules.monitor.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.geosaa.common.PageResult;
 import com.geosaa.common.Result;
+import com.geosaa.modules.monitor.collector.GeoDataCollectorService;
 import com.geosaa.modules.monitor.entity.DataMonitorStat;
 import com.geosaa.modules.monitor.service.MonitorService;
 import jakarta.validation.Valid;
@@ -16,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 数据监测控制器 - 核心指标、趋势数据、竞品对比
+ * 数据监测控制器 - 核心指标、趋势数据、竞品对比、GEO 采集
  */
 @RestController
 @RequestMapping("/api/v1/monitor")
@@ -24,6 +25,7 @@ import java.util.Map;
 public class MonitorController {
 
     private final MonitorService monitorService;
+    private final GeoDataCollectorService geoDataCollectorService;
 
     /**
      * 分页查询统计数据
@@ -88,5 +90,15 @@ public class MonitorController {
     public Result<List<Map<String, Object>>> getCompetitor(@RequestParam(required = false) String brandName) {
         List<Map<String, Object>> competitors = monitorService.getCompetitorComparison(brandName);
         return Result.success(competitors);
+    }
+
+    /**
+     * 手动触发 GEO 真实数据采集（G-01）。
+     * 未启用采集器或未配置品牌/引擎时返回 skipped 说明，不写库。
+     */
+    @PostMapping("/collect")
+    @PreAuthorize("hasAuthority('monitor:all')")
+    public Result<Map<String, Object>> collect() {
+        return Result.success(geoDataCollectorService.collectAll());
     }
 }

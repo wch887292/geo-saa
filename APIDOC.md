@@ -91,6 +91,7 @@
 | GET  | `/monitor/core-metrics` | 核心指标：`{mentionRate, firstRecommendRate, collectionCount, score, simulated, hasData}`；`hasData=false` 表示无真实数据（模拟模式打 `simulated` 标，生产关闭模拟时返回 0） |
 | GET  | `/monitor/trend` | 趋势数据（参数 `statType/period/days`） |
 | GET  | `/monitor/competitor` | 竞品对比 |
+| **POST** | **`/monitor/collect`** | **★手动触发 GEO 真实采集**（G-01）：立即执行一次全品牌采集并写库；未启用/未配置时返回 `skipped` 说明不写库（需 `monitor:all` 权限） |
 
 ## 资产存证 `/asset` ★（O7 独立数据模型）
 

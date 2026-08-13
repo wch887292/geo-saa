@@ -40,6 +40,9 @@
 |------|------|
 | [架构说明](docs/ARCHITECTURE.md) | 系统架构、模块划分与数据流 |
 | [开发路线图](docs/ROADMAP.md) | 未来规划与社区计划 |
+| [GEO/AAO 开发指南](docs/GEO_AAO_DEV_GUIDE.md) | 三代搜索优化（SEO/AEO/GEO/AAO）战略与产品映射 |
+| [复盘优化报告](docs/RETROSPECTIVE_OPTIMIZATION.md) | 体检发现与工程化优化记录 |
+| [Docker 实测指南](docs/DOCKER_COMPOSE_TEST.md) | Compose 一键部署验证清单 |
 | [API 文档](APIDOC.md) | 接口清单与字段说明 |
 | [贡献指南](CONTRIBUTING.md) | 如何提 Issue / Pull Request |
 | [行为准则](CODE_OF_CONDUCT.md) | 社区行为公约 |
@@ -215,6 +218,9 @@ geo-saa/
 - 多行业模板支持（科技、医疗、教育、金融、电商、法律）
 - 批量生成 AI 优化文章
 - 敏感词过滤
+- **GEO 九战术健康度校验**（`POST /content/geo-validate`）：按 Princeton KDD 2024 论文九大战术
+  （专家引语 / 量化数据 / 引用来源 / 流畅度 / 技术术语等）加权评分；
+  **关键词堆砌自动拦截**（论文实测可见度 −8%~−10%），创建内容时返回 400
 
 ### 4. 多渠道分发
 - 支持 150+ 渠道分发
@@ -225,8 +231,16 @@ geo-saa/
 - 搜索排名监控
 - 流量分析
 - 品牌声量趋势
+- 核心指标含**数据真实性闸门**：`hasData=false` 时不再用随机数冒充
+  （模拟模式打 `simulated` 标，生产关闭模拟返回真实空值）
+- **GEO 真实数据采集器**（可配 Perplexity / OpenAI 兼容网关，每日自动采集
+  mentionRate/首推率/收录量写入统计表，失败绝不写入模拟数据）
 
-### 6. 系统管理
+### 6. 资产存证
+- 独立 `asset_record` 数据模型（内容/知识/分发/诊断聚合 + 独立存证双视图）
+- 按年/月过滤、分页浏览品牌资产
+
+### 7. 系统管理
 - 用户认证与权限管理
 - AI 模型配置（OpenAI / 通义千问 / 豆包）
 - 模拟模式（无需 API Key 即可体验）

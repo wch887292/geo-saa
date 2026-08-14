@@ -46,6 +46,7 @@
 | [复盘优化报告](docs/RETROSPECTIVE_OPTIMIZATION.md) | 体检发现与工程化优化记录 |
 | [Docker 实测指南](docs/DOCKER_COMPOSE_TEST.md) | Compose 一键部署验证清单 |
 | [依赖升级评估](docs/DEPENDENCY_ASSESSMENT.md) | 前端大版本升级风险与验收标准 |
+| [GEO 采集器试采手册](docs/GEO_COLLECTOR_RUNBOOK.md) | 配真实 Key 后 3 分钟完成首次试采 |
 | [API 文档](APIDOC.md) | 接口清单与字段说明 |
 | [贡献指南](CONTRIBUTING.md) | 如何提 Issue / Pull Request |
 | [行为准则](CODE_OF_CONDUCT.md) | 社区行为公约 |

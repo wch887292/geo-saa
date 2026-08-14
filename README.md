@@ -290,6 +290,25 @@ A: 检查 Vite 代理配置 `vite.config.js`，确保 `target` 指向正确的�
 ### Q: 不需要 RabbitMQ
 A: 开发模式下 RabbitMQ 已禁用（`application-dev.yml` 中配置），不影响正常使用。
 
+
+---
+
+## 🤝 社区支持
+
+关注飞虹智 klAI 动态，获取最新开源项目更新与技术教程：
+
+![社区支持二维码](https://github.com/geo-saa/releases/download/v1.0.0-community/qrcode-community.png)
+
+扫码加入 **飞虹智企微小助手**，获取：
+- 技术答疑与部署指导
+- 开源项目更新通知
+- 本地化服务预约（泉州地区）
+- 企业 AI 数字化咨询
+
+---
+
+*晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心 · 负责人：吴赐虹*
+
 ## 开源许可证
 
 本项目采用 [MIT License](LICENSE) 开源。欢迎通过 [贡献指南](CONTRIBUTING.md) 提交 Issue 与 Pull Request，共建社区。

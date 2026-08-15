@@ -44,9 +44,11 @@ jobs:
       - name: Install & build (lockfile-pinned)
         working-directory: geo-saa-frontend
         run: |
-          # npm ci 在 Linux 上偶发不装 rollup 原生 optional 模块（npm#4828，
-          # Windows 生成的 lockfile 无法在 CI 完整复现），失败时降级 npm install 补装
-          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          # Windows 生成的 package-lock.json 在 Linux 上 npm ci 偶发缺 rollup
+          # 原生 optional 模块（npm#4828，ci 退出码为 0 但构建时报
+          # Cannot find module @rollup/rollup-linux-x64-gnu）。改用 npm install
+          #（lock 存在时同样锁定版本，但对平台 optional 模块补装更鲁棒）
+          npm install --no-audit --no-fund
           npm run build
 
   # ---------- 端到端冒烟：MySQL + Redis + 后端(dev) + smoke_test.py ----------

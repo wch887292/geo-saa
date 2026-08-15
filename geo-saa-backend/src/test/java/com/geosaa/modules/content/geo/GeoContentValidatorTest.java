@@ -37,6 +37,39 @@ class GeoContentValidatorTest {
     }
 
     @Test
+    void geoV2DimensionsArePresent() {
+        GeoValidationResult result = validator.validate(GOOD_CONTENT, "AI搜索,品牌营销");
+
+        // GEO v2 新维度必须出现在报告中
+        for (String code : new String[]{
+                GeoContentValidator.T_ANSWER_FIRST,
+                GeoContentValidator.T_FACT_DENSITY,
+                GeoContentValidator.T_STRUCTURED_DATA,
+                GeoContentValidator.T_EEAT,
+                GeoContentValidator.T_KEY_QUOTE,
+                GeoContentValidator.T_FRESHNESS,
+                GeoContentValidator.T_OWN_CITATIONS}) {
+            assertNotNull(result.getTactics().get(code), "缺少维度 " + code);
+        }
+        // GOOD 内容：答案前置(含"达"+数字)、事实密度(数字多)、E-E-A-T(公司/官方/认证)、一手来源(URL+官方) 应高分
+        assertTrue(result.getTactics().get(GeoContentValidator.T_ANSWER_FIRST).getScore() >= 70);
+        assertTrue(result.getTactics().get(GeoContentValidator.T_FACT_DENSITY).getScore() >= 70);
+        assertTrue(result.getTactics().get(GeoContentValidator.T_EEAT).getScore() >= 70);
+        assertTrue(result.getTactics().get(GeoContentValidator.T_FRESHNESS).getScore() >= 70);
+    }
+
+    @Test
+    void oldContentScoresLowOnFreshness() {
+        // 一年前的旧内容 → 新鲜度低分
+        GeoValidationResult result = validator.validate(GOOD_CONTENT, "AI搜索",
+                java.time.LocalDate.now().minusYears(1));
+
+        assertTrue(result.getTactics().get(GeoContentValidator.T_FRESHNESS).getScore() < 70,
+                "一年前内容新鲜度应低分，实际 "
+                        + result.getTactics().get(GeoContentValidator.T_FRESHNESS).getScore());
+    }
+
+    @Test
     void keywordStuffingIsBlocked() {
         // 关键词「AI搜索」反复出现 → 密度超阈值
         String stuffing = "AI搜索很重要，AI搜索能帮助企业，企业必须做AI搜索，AI搜索是趋势，"

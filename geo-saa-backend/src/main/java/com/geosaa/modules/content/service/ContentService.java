@@ -247,10 +247,17 @@ public class ContentService {
     }
 
     /**
-     * GEO 九战术内容健康度校验（透传校验器，供控制器与内部流程共用）。
+     * GEO 内容健康度校验（透传校验器，供控制器与内部流程共用）。
      */
     public GeoValidationResult validateGeo(String content, String keywords) {
         return geoContentValidator.validate(content, keywords);
+    }
+
+    /**
+     * GEO 内容健康度校验（含发布时间，用于新鲜度评分，GEO v2）。
+     */
+    public GeoValidationResult validateGeo(String content, String keywords, java.time.LocalDate publishDate) {
+        return geoContentValidator.validate(content, keywords, publishDate);
     }
 
     /**

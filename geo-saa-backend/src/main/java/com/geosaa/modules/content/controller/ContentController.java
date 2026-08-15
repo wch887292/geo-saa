@@ -139,14 +139,24 @@ public class ContentController {
     }
 
     /**
-     * GEO 九战术内容健康度校验（Princeton KDD 2024 九大战术）。
+     * GEO 内容健康度校验（Princeton KDD 2024 九大战术 + 2026 新维度）。
      * 关键词堆砌密度超阈值时 {@code blocked=true}。
+     * 可选参数 {@code publishDate}（yyyy-MM-dd）影响新鲜度评分。
      */
     @PostMapping("/geo-validate")
     public Result<com.geosaa.modules.content.geo.GeoValidationResult> geoValidate(
             @RequestBody Map<String, String> request) {
+        java.time.LocalDate publishDate = null;
+        String pd = request.get("publishDate");
+        if (pd != null && !pd.isBlank()) {
+            try {
+                publishDate = java.time.LocalDate.parse(pd);
+            } catch (Exception ignored) {
+                // 日期格式错误时忽略，走默认（今天）
+            }
+        }
         com.geosaa.modules.content.geo.GeoValidationResult result =
-                contentService.validateGeo(request.get("content"), request.get("keywords"));
+                contentService.validateGeo(request.get("content"), request.get("keywords"), publishDate);
         return Result.success(result);
     }
 }

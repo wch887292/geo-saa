@@ -1,0 +1,47 @@
+{
+  "name": "@feihong/geo-engine",
+  "version": "0.1.0",
+  "description": "GEO/AAO 引擎：九战术内容健康度校验（Princeton KDD 2024）+ 2026 GEO v2 维度（答案前置/事实密度/结构化数据/E-E-A-T）+ AI Agent Optimization AX Score 评估与 llms.txt/agent.json 生成",
+  "keywords": [
+    "geo",
+    "generative-engine-optimization",
+    "aao",
+    "ai-agent-optimization",
+    "llms.txt",
+    "ax-score",
+    "seo",
+    "aeo",
+    "content-optimization"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "lib/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prepublishOnly": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wch887292/geo-saa.git"
+  },
+  "homepage": "https://github.com/wch887292/geo-saa/tree/main/geo-engine",
+  "bugs": {
+    "url": "https://github.com/wch887292/geo-saa/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

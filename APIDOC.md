@@ -81,6 +81,14 @@
 | POST | `/distribute/callback/{id}` | 渠道回调 |
 | GET  | `/distribute/stats` | 分发统计（byPlatform/status 分布） |
 
+## GEO / AAO 能力 `/geo` ★（2026 升级）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| **POST** | **`/geo/aao-validate`** | **★AAO 就绪度评估**：提交 `AaoProfile`（domain/hasLlmsTxt/hasMcpCard/hasAgentJson/allowAiCrawlers/...），返回 AX Score 六维度报告 `{axScore, grade, dimensions, suggestions}`（Crawlability 25/StructuredData 25/ContentQuality 15/Interaction 20/Discoverability 10/Trust 5） |
+| **GET** | **`/geo/llms-txt`** | **★生成 llms.txt**（llmstxt.org 格式）：参数 `brandName/siteUrl/description/pages`（"标题: URL"逗号分隔） |
+| **GET** | **`/geo/agent-json`** | **★生成 A2A agent.json**：参数 `brandName/siteUrl/description/skills/dispatchUrl` |
+
 ## 数据监测 `/monitor`
 
 | 方法 | 路径 | 说明 |

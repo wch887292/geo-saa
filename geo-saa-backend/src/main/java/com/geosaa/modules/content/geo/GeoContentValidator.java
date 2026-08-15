@@ -2,6 +2,8 @@ package com.geosaa.modules.content.geo;
 
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,15 +41,24 @@ public class GeoContentValidator {
     public static final String T_FLUENCY = "fluency";
     public static final String T_UNIQUE_WORDS = "unique_words";
     public static final String T_TECHNICAL_TERMS = "technical_terms";
+    // ---- GEO v2 新维度（对标 2026 规则）----
+    public static final String T_ANSWER_FIRST = "answer_first";
+    public static final String T_FACT_DENSITY = "fact_density";
+    public static final String T_STRUCTURED_DATA = "structured_data";
+    public static final String T_EEAT = "eeat";
+    public static final String T_KEY_QUOTE = "key_quote";
+    public static final String T_FRESHNESS = "freshness";
+    public static final String T_OWN_CITATIONS = "own_citations";
 
     /** 默认关键词堆砌拦截阈值：密度 &gt; 3% 触发 blocked */
     public static final double KEYWORD_STUFFING_THRESHOLD = 0.03;
 
-    /** 八项正向策略权重（归一化，总和 = 1.0） */
+    /** 15 项正向策略权重（归一化，总和 = 1.0） */
     private static final Map<String, Double> WEIGHTS = new LinkedHashMap<>();
     private static final Map<String, String> NAMES = new LinkedHashMap<>();
 
     static {
+        // ---- 九战术（Princeton KDD 2024）----
         NAMES.put(T_QUOTATIONS, "专家引语");
         NAMES.put(T_STATISTICS, "量化数据");
         NAMES.put(T_FLUENCY, "流畅度");
@@ -57,15 +68,31 @@ public class GeoContentValidator {
         NAMES.put(T_AUTHORITATIVE, "权威语气");
         NAMES.put(T_UNIQUE_WORDS, "独特词汇");
         NAMES.put(T_KEYWORD_STUFFING, "关键词堆砌");
+        // ---- GEO v2 新维度（2026 规则）----
+        NAMES.put(T_ANSWER_FIRST, "答案前置");
+        NAMES.put(T_FACT_DENSITY, "事实密度");
+        NAMES.put(T_STRUCTURED_DATA, "结构化数据");
+        NAMES.put(T_EEAT, "E-E-A-T");
+        NAMES.put(T_KEY_QUOTE, "关键引语");
+        NAMES.put(T_FRESHNESS, "新鲜度");
+        NAMES.put(T_OWN_CITATIONS, "一手来源");
 
-        WEIGHTS.put(T_QUOTATIONS, 0.23);
-        WEIGHTS.put(T_STATISTICS, 0.18);
-        WEIGHTS.put(T_FLUENCY, 0.16);
-        WEIGHTS.put(T_CITE_SOURCES, 0.16);
-        WEIGHTS.put(T_TECHNICAL_TERMS, 0.10);
-        WEIGHTS.put(T_EASY_TO_UNDERSTAND, 0.08);
-        WEIGHTS.put(T_AUTHORITATIVE, 0.06);
-        WEIGHTS.put(T_UNIQUE_WORDS, 0.03);
+        WEIGHTS.put(T_QUOTATIONS, 0.12);
+        WEIGHTS.put(T_STATISTICS, 0.10);
+        WEIGHTS.put(T_CITE_SOURCES, 0.08);
+        WEIGHTS.put(T_FLUENCY, 0.07);
+        WEIGHTS.put(T_TECHNICAL_TERMS, 0.05);
+        WEIGHTS.put(T_EASY_TO_UNDERSTAND, 0.05);
+        WEIGHTS.put(T_AUTHORITATIVE, 0.04);
+        WEIGHTS.put(T_UNIQUE_WORDS, 0.02);
+        // 2026 新增：答案前置 / 事实密度 / 结构化数据 权重最高
+        WEIGHTS.put(T_ANSWER_FIRST, 0.10);
+        WEIGHTS.put(T_FACT_DENSITY, 0.10);
+        WEIGHTS.put(T_STRUCTURED_DATA, 0.09);
+        WEIGHTS.put(T_EEAT, 0.07);
+        WEIGHTS.put(T_KEY_QUOTE, 0.04);
+        WEIGHTS.put(T_FRESHNESS, 0.04);
+        WEIGHTS.put(T_OWN_CITATIONS, 0.03);
     }
 
     // ---------- 启发式模式 ----------
@@ -105,12 +132,27 @@ public class GeoContentValidator {
     // ---------- 主入口 ----------
 
     /**
-     * 校验内容 GEO 健康度。
+     * 校验内容 GEO 健康度（发布时间默认今天，新鲜度按最严口径计分）。
      *
      * @param content  待校验正文
      * @param keywords 目标关键词（逗号分隔），用于关键词密度判定，可为空
      */
     public GeoValidationResult validate(String content, String keywords) {
+        return validate(content, keywords, LocalDate.now());
+    }
+
+    /**
+     * 校验内容 GEO 健康度（GEO v2：九战术 + 2026 新维度）。
+     *
+     * <p>15 项正向维度加权（归一化总和 1.0），关键词堆砌密度超阈值时 {@code blocked=true}
+     * 且总分折半。新增维度对标 2026 规则：答案前置 200 字、事实密度、JSON-LD 结构化数据、
+     * E-E-A-T 信号、关键引语、新鲜度（30/90/365 天三档）、一手来源引用。
+     *
+     * @param content     待校验正文
+     * @param keywords    目标关键词（逗号分隔），可为空
+     * @param publishDate 内容发布时间（影响新鲜度评分），可为空（默认今天）
+     */
+    public GeoValidationResult validate(String content, String keywords, LocalDate publishDate) {
         GeoValidationResult result = new GeoValidationResult();
         if (content == null || content.isBlank()) {
             result.setBlocked(false);
@@ -126,6 +168,7 @@ public class GeoContentValidator {
         String text = content.trim();
         List<String> kwList = splitKeywords(keywords);
 
+        // 九战术
         int statisticsScore = scoreStatistics(text);
         int citeScore = scoreCiteSources(text);
         int quoteScore = scoreQuotations(text);
@@ -134,6 +177,14 @@ public class GeoContentValidator {
         int fluencyScore = scoreFluency(text);
         int uniqueScore = scoreUniqueWords(text);
         int termScore = scoreTechnicalTerms(text);
+        // GEO v2 新维度
+        int answerFirstScore = scoreAnswerFirst(text);
+        int factDensityScore = scoreFactDensity(text);
+        int structuredScore = scoreStructuredData(text);
+        int eeatScore = scoreEeat(text);
+        int keyQuoteScore = scoreKeyQuote(text);
+        int freshnessScore = scoreFreshness(publishDate);
+        int ownCitationScore = scoreOwnCitations(text);
         StuffingResult stuffing = scoreKeywordStuffing(text, kwList);
 
         // 加权总分（不含堆砌负向项）
@@ -146,6 +197,13 @@ public class GeoContentValidator {
         scores.put(T_FLUENCY, fluencyScore);
         scores.put(T_UNIQUE_WORDS, uniqueScore);
         scores.put(T_TECHNICAL_TERMS, termScore);
+        scores.put(T_ANSWER_FIRST, answerFirstScore);
+        scores.put(T_FACT_DENSITY, factDensityScore);
+        scores.put(T_STRUCTURED_DATA, structuredScore);
+        scores.put(T_EEAT, eeatScore);
+        scores.put(T_KEY_QUOTE, keyQuoteScore);
+        scores.put(T_FRESHNESS, freshnessScore);
+        scores.put(T_OWN_CITATIONS, ownCitationScore);
 
         double weighted = 0;
         for (Map.Entry<String, Integer> e : scores.entrySet()) {
@@ -295,6 +353,81 @@ public class GeoContentValidator {
         return new StuffingResult(100, desc + "，密度正常", false);
     }
 
+    // ---------- GEO v2 新维度评分（2026 规则） ----------
+
+    /**
+     * 答案前置：AI 引擎常只读前 200 字，核心答案必须出现在开头。
+     * 命中信号：前 200 字符含结论词（是/为/达到/增长/建议/推荐/提供）或数字或关键词。
+     */
+    private int scoreAnswerFirst(String text) {
+        String head = text.substring(0, Math.min(200, text.length()));
+        if (head.length() < 40) return 40; // 短文无法评估前置
+        boolean conclusion = Pattern.compile("是|为|达到|增长|建议|推荐|提供|实现|覆盖|支持").matcher(head).find();
+        boolean hasNumber = Pattern.compile("\\d").matcher(head).find();
+        if (conclusion && hasNumber) return 100;
+        if (conclusion || hasNumber) return 70;
+        return 30;
+    }
+
+    /**
+     * 事实密度：每节至少一个可引用事实（数字+名词/名称/日期）。
+     * 统计「数字+单位」与「年份/日期」出现密度。
+     */
+    private int scoreFactDensity(String text) {
+        int facts = count(STAT_PATTERN, text) + count(Pattern.compile("\\d{4}年|\\d{4}-\\d{2}"), text);
+        if (facts >= 5) return 100;
+        if (facts >= 3) return 70;
+        if (facts >= 1) return 40;
+        return 0;
+    }
+
+    /** 结构化数据：JSON-LD / schema.org 标记检测（2026 引用概率 +2.5x） */
+    private int scoreStructuredData(String text) {
+        if (text.contains("application/ld+json") || text.contains("\"@context\"") || text.contains("@context")) return 100;
+        if (text.contains("schema.org") || text.contains("\"@type\"") || text.contains("JSON-LD") || text.contains("jsonld")) return 70;
+        return 0;
+    }
+
+    /** E-E-A-T：作者署名 / 日期 / 机构 / 资质四类信号 */
+    private int scoreEeat(String text) {
+        int hits = 0;
+        if (Pattern.compile("作者[:：]|撰文|文[:：]|By |byline|作者署名").matcher(text).find()) hits++;
+        if (Pattern.compile("\\d{4}年\\d{1,2}月|\\d{4}-\\d{2}-\\d{2}|发布时间|更新于").matcher(text).find()) hits++;
+        if (Pattern.compile("公司|研究院|大学|学院|官方|机构|实验室|平台").matcher(text).find()) hits++;
+        if (Pattern.compile("认证|博士|教授|专家|资质|证书|高级工程师").matcher(text).find()) hits++;
+        if (hits >= 3) return 100;
+        if (hits == 2) return 70;
+        if (hits == 1) return 40;
+        return 0;
+    }
+
+    /** 关键引语：blockquote 标记 / 加粗独立引语（AI 视为 key takeaway） */
+    private int scoreKeyQuote(String text) {
+        if (text.contains(">") || text.contains("**") || text.contains("【核心】") || text.contains("一句话总结")) return 100;
+        if (text.contains("核心观点") || text.contains("要点") || text.contains("结论")) return 60;
+        return 0;
+    }
+
+    /** 新鲜度：内容发布时间距今（30 天内满分，AI 偏好新鲜来源） */
+    private int scoreFreshness(LocalDate publishDate) {
+        if (publishDate == null) return 50; // 未提供日期按中值
+        long days = ChronoUnit.DAYS.between(publishDate, LocalDate.now());
+        if (days <= 30) return 100;
+        if (days <= 90) return 70;
+        if (days <= 365) return 40;
+        return 10;
+    }
+
+    /** 一手来源引用：外链到一手来源（官方文档/报告/研究） */
+    private int scoreOwnCitations(String text) {
+        int links = count(URL_PATTERN, text);
+        int primaryHint = count(Pattern.compile("(官方|官网|文档|白皮书|研究报告|论文|arXiv|github\\.com|gov\\.|org\\.)"), text);
+        if (links >= 2 && primaryHint >= 1) return 100;
+        if (links >= 1 && primaryHint >= 1) return 70;
+        if (links >= 1) return 40;
+        return 0;
+    }
+
     // ---------- 工具方法 ----------
 
     private List<String> splitKeywords(String keywords) {
@@ -355,6 +488,27 @@ public class GeoContentValidator {
         TacticScore stuffing = result.getTactics().get(T_KEYWORD_STUFFING);
         if (stuffing != null && stuffing.getScore() < 100) {
             suggestions.add("降低关键词重复密度，AI 引擎按语义而非词频理解内容");
+        }
+        // ---- GEO v2 新维度建议 ----
+        TacticScore answer = result.getTactics().get(T_ANSWER_FIRST);
+        if (answer != null && answer.getScore() < 70) {
+            suggestions.add("前 200 字直接给出核心答案（AI 常只读开头，结论前置 + 数字佐证）");
+        }
+        TacticScore fact = result.getTactics().get(T_FACT_DENSITY);
+        if (fact != null && fact.getScore() < 70) {
+            suggestions.add("提升事实密度：每节至少 1 个可引用事实（数字/名称/日期，如「覆盖 200+ 企业」）");
+        }
+        TacticScore schema = result.getTactics().get(T_STRUCTURED_DATA);
+        if (schema != null && schema.getScore() < 70) {
+            suggestions.add("部署 JSON-LD 结构化数据（Article/FAQPage/Organization，2026 引用概率 +2.5x）");
+        }
+        TacticScore eeat = result.getTactics().get(T_EEAT);
+        if (eeat != null && eeat.getScore() < 70) {
+            suggestions.add("补齐 E-E-A-T 信号：作者署名 + 发布日期 + 机构资质（AI 信任度关键）");
+        }
+        TacticScore fresh = result.getTactics().get(T_FRESHNESS);
+        if (fresh != null && fresh.getScore() < 70) {
+            suggestions.add("更新内容发布时间（AI 偏好 30 天内的新鲜来源，schema 中补 dateModified）");
         }
         if (suggestions.isEmpty()) {
             suggestions.add("内容 GEO 健康度良好，可保持当前结构");

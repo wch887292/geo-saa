@@ -1,4 +1,4 @@
-# @feihong/geo-engine
+# @wch-klzx/geo-engine
 
 GEO/AAO 引擎 —— AI 搜索可见度（GEO）与 AI Agent 就绪度（AAO）的工程化校验与生成工具。
 
@@ -11,7 +11,7 @@ GEO/AAO 引擎 —— AI 搜索可见度（GEO）与 AI Agent 就绪度（AAO）
 ## 安装
 
 ```bash
-npm install @feihong/geo-engine
+npm install @wch-klzx/geo-engine
 ```
 
 ## 用法
@@ -19,7 +19,7 @@ npm install @feihong/geo-engine
 ### 1. GEO 内容健康度校验
 
 ```js
-import { validateGeo } from '@feihong/geo-engine';
+import { validateGeo } from '@wch-klzx/geo-engine';
 
 const result = validateGeo(
   '据《中国AI产业白皮书》显示，2025年中国AI市场规模达 4500 亿元，同比增长 35%（来源：工信部）。专家表示：「AI搜索正在重塑品牌获客方式。」参考 https://klai.top 了解更多。',
@@ -36,7 +36,7 @@ console.log(result.suggestions);// 优化建议
 ### 2. AAO / Agent 就绪度评估
 
 ```js
-import { evaluateAao } from '@feihong/geo-engine';
+import { evaluateAao } from '@wch-klzx/geo-engine';
 
 const report = evaluateAao({
   allowAiCrawlers: true,      // robots.txt 放行 GPTBot/ClaudeBot/PerplexityBot
@@ -62,7 +62,7 @@ console.log(report.suggestions);   // 待办清单
 ### 3. 生成 llms.txt / agent.json
 
 ```js
-import { generateLlmsTxt, generateAgentJson } from '@feihong/geo-engine';
+import { generateLlmsTxt, generateAgentJson } from '@wch-klzx/geo-engine';
 
 const llms = generateLlmsTxt('飞虹智', 'https://klai.top',
   '泉州制造业 AI 服务商。', ['官网: https://klai.top']);

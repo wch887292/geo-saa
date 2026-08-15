@@ -1,4 +1,4 @@
-# @feihong/geo-engine · npm 发布手册
+# @wch-klzx/geo-engine · npm 发布手册
 
 > 目标：把 GEO/AAO 引擎（`geo-engine/`）发布到 npm，供品牌站点 / CI 内容门禁 / GEO 审计脚本复用。
 > 发布自动化已就绪：打 `v*` tag 即触发 GitHub Actions 自动 publish。
@@ -7,11 +7,11 @@
 
 1. **注册 npm 账号**：https://www.npmjs.com/signup
 2. **创建 Granular Access Token**：npmjs.com → Access Tokens → Generate New Token
-   - 类型选 **Granular Access Token**，权限勾选 **Read and write**，仅授权给 `@feihong/geo-engine` 包（最小权限）
+   - 类型选 **Granular Access Token**，权限勾选 **Read and write**，仅授权给 `@wch-klzx/geo-engine` 包（最小权限）
 3. **把 token 存入仓库 Secrets**：
    - GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret
    - Name: `NPM_TOKEN`，Value: 粘贴 token（只写一次，GitHub 加密存储）
-4. **（可选）验证包名可用**：`npm view @feihong/geo-engine` 应报 404（未发布过）
+4. **（可选）验证包名可用**：`npm view @wch-klzx/geo-engine` 应报 404（未发布过）
 
 ## 二、发布流程（每次发版）
 
@@ -37,9 +37,9 @@ npm publish --access public
 ## 四、验证
 
 ```bash
-npm view @feihong/geo-engine          # 版本 / 描述 / 文件清单
-npm install @feihong/geo-engine       # 在任意项目验证可安装
-node -e "import('@feihong/geo-engine').then(m => console.log(m.validateGeo('测试内容 100 家客户','品牌').totalScore))"
+npm view @wch-klzx/geo-engine          # 版本 / 描述 / 文件清单
+npm install @wch-klzx/geo-engine       # 在任意项目验证可安装
+node -e "import('@wch-klzx/geo-engine').then(m => console.log(m.validateGeo('测试内容 100 家客户','品牌').totalScore))"
 ```
 
 ## 五、包内容（files 白名单）

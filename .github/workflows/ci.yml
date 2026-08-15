@@ -44,7 +44,9 @@ jobs:
       - name: Install & build (lockfile-pinned)
         working-directory: geo-saa-frontend
         run: |
-          npm ci --no-audit --no-fund
+          # npm ci 在 Linux 上偶发不装 rollup 原生 optional 模块（npm#4828，
+          # Windows 生成的 lockfile 无法在 CI 完整复现），失败时降级 npm install 补装
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
           npm run build
 
   # ---------- 端到端冒烟：MySQL + Redis + 后端(dev) + smoke_test.py ----------

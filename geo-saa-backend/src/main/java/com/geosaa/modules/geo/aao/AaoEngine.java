@@ -176,7 +176,29 @@ public class AaoEngine {
         return s == null || s.isBlank() ? fallback : s.trim();
     }
 
+    /**
+     * JSON 字符串安全转义：除反斜杠与双引号外，额外处理换行 / 回车 / 制表等
+     * 控制字符，避免品牌名或描述含换行时生成非法 JSON（agent.json 解析失败）。
+     */
     private String jsonEscape(String s) {
-        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\' -> sb.append("\\\\");
+                case '"' -> sb.append("\\\"");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                default -> {
+                    if (c < 0x20) sb.append(String.format("\\u%04x", (int) c));
+                    else sb.append(c);
+                }
+            }
+        }
+        return sb.toString();
     }
 }

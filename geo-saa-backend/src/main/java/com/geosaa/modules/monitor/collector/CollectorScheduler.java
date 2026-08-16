@@ -26,7 +26,8 @@ public class CollectorScheduler {
         log.info("GEO 定时采集开始");
         try {
             var report = collectorService.collectAll();
-            log.info("GEO 定时采集结束: {}", report.get("summary"));
+            Object summary = report.get("summary");
+            log.info("GEO 定时采集结束: {}", summary == null ? "无数据/已跳过" : summary);
         } catch (Exception e) {
             log.error("GEO 定时采集异常", e);
         }

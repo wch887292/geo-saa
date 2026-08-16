@@ -51,8 +51,9 @@ public class PerplexityClient implements AiSearchEngineClient {
                 .execute()) {
 
             if (!resp.isOk()) {
+                String errBody = resp.body();
                 throw new IllegalStateException("Perplexity HTTP " + resp.getStatus() + ": "
-                        + resp.body().substring(0, Math.min(200, resp.body().length())));
+                        + (errBody == null ? "" : errBody.substring(0, Math.min(200, errBody.length()))));
             }
             JsonNode root = objectMapper.readTree(resp.body());
             JsonNode content = root.path("choices").path(0).path("message").path("content");

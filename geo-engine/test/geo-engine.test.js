@@ -74,3 +74,14 @@ test('AAO: agent.json 骨架合法', () => {
   assert.ok(json.includes('"skills": ["品牌诊断", "GEO 内容生成"]'));
   assert.doesNotThrow(() => JSON.parse(json));
 });
+
+test('AAO: agent.json 含换行/引号/控制字符仍为合法 JSON', () => {
+  const json = generateAgentJson('飞虹智\n第二行', 'https://klai.top',
+    '描述含"引号"与\t制表与\n换行', ['技能A', '技能"B'], '/api/agent');
+  // 关键：未转义时 JSON.parse 会直接抛错；修复后必须可解析且换行/引号正确往返
+  assert.doesNotThrow(() => JSON.parse(json), '含特殊字符的 agent.json 必须是合法 JSON');
+  const parsed = JSON.parse(json);
+  assert.equal(parsed.name, '飞虹智\n第二行', 'name 换行应正确往返');
+  assert.equal(parsed.description, '描述含"引号"与\t制表与\n换行', 'description 引号/制表/换行应正确往返');
+  assert.deepEqual(parsed.skills, ['技能A', '技能"B'], 'skills 内引号应正确转义');
+});

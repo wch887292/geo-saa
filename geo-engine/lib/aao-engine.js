@@ -124,7 +124,18 @@ export function generateLlmsTxt(brandName, siteUrl, description = '', pages = []
 
 /** 生成 /.well-known/agent.json（A2A AgentCard 骨架） */
 export function generateAgentJson(brandName, siteUrl = '', description = '', skills = [], dispatchUrl = '/api/agent') {
-  const esc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const esc = s => {
+    const str = String(s ?? '');
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t')
+      .replace(/\f/g, '\\f')
+      .replace(/[\b]/g, '\\b')
+      .replace(/[\u0000-\u001F]/g, ch => '\\u' + ch.charCodeAt(0).toString(16).padStart(4, '0'));
+  };
   let out = '{\n';
   out += `  "name": "${esc(brandName || 'agent')}",\n`;
   out += `  "description": "${esc(description || 'AI Agent 能力描述')}",\n`;

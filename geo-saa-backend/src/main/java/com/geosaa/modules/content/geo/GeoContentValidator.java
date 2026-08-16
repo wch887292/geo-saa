@@ -53,7 +53,7 @@ public class GeoContentValidator {
     /** 默认关键词堆砌拦截阈值：密度 &gt; 3% 触发 blocked */
     public static final double KEYWORD_STUFFING_THRESHOLD = 0.03;
 
-    /** 15 项正向策略权重（归一化，总和 = 1.0） */
+    /** 16 项正向策略权重（九战术 + 2026 新维度，归一化总和 = 1.0） */
     private static final Map<String, Double> WEIGHTS = new LinkedHashMap<>();
     private static final Map<String, String> NAMES = new LinkedHashMap<>();
 
@@ -144,7 +144,7 @@ public class GeoContentValidator {
     /**
      * 校验内容 GEO 健康度（GEO v2：九战术 + 2026 新维度）。
      *
-     * <p>15 项正向维度加权（归一化总和 1.0），关键词堆砌密度超阈值时 {@code blocked=true}
+     * <p>16 项正向维度加权（九战术 + 2026 新维度，归一化总和 1.0），关键词堆砌密度超阈值时 {@code blocked=true}
      * 且总分折半。新增维度对标 2026 规则：答案前置 200 字、事实密度、JSON-LD 结构化数据、
      * E-E-A-T 信号、关键引语、新鲜度（30/90/365 天三档）、一手来源引用。
      *

@@ -140,6 +140,15 @@ public class StatisticsService {
         return null;
     }
 
+    /**
+     * 同 {@link #parseScore} 但保证非 null：趋势图表遇到 null 会出现断点 / NaN，
+     * 无评分可用时以 0 填充，保证前端折线图连续渲染。
+     */
+    private int safeParseScore(String resultContent) {
+        Integer s = parseScore(resultContent);
+        return s == null ? 0 : s;
+    }
+
     private long safeCount(Long count) {
         return count == null ? 0L : count;
     }
@@ -185,7 +194,7 @@ public class StatisticsService {
                 } else {
                     categories.add("-");
                 }
-                series.add(parseScore(task.getResultContent()));
+                series.add(safeParseScore(task.getResultContent()));
             }
             trend.put("categories", categories);
             trend.put("series", Collections.singletonList(new LinkedHashMap<String, Object>() {{

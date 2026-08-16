@@ -56,6 +56,12 @@ const routes = [
         meta: { title: '数据看板', icon: 'DataAnalysis' }
       },
       {
+        path: 'geo',
+        name: 'Geo',
+        component: () => import('@/views/geo/index.vue'),
+        meta: { title: 'GEO/AAO 体检', icon: 'MagicStick' }
+      },
+      {
         path: 'system/permission',
         name: 'SystemPermission',
         component: () => import('@/views/system/permission.vue'),

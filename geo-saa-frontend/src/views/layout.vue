@@ -42,6 +42,10 @@
           <el-icon><DataAnalysis /></el-icon>
           <template #title>数据看板</template>
         </el-menu-item>
+        <el-menu-item index="/geo">
+          <el-icon><MagicStick /></el-icon>
+          <template #title>GEO/AAO 体检</template>
+        </el-menu-item>
         <el-sub-menu index="system">
           <template #title>
             <el-icon><Setting /></el-icon>

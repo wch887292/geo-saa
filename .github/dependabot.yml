@@ -19,6 +19,20 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+    # 破坏性大版本升级需人工评估，暂不自动提交（保留 minor/patch 安全更新）
+    ignore:
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-vue"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vue-router"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pinia"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vue-echarts"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "echarts"
+        update-types: ["version-update:semver-major"]
 
   # 后端 Maven 依赖
   - package-ecosystem: "maven"
@@ -29,3 +43,7 @@ updates:
     labels:
       - "dependencies"
       - "backend"
+    # Spring Boot 4.x 为破坏性大版本，需人工评估，暂不自动提交（保留 3.2.x 安全补丁）
+    ignore:
+      - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
+        update-types: ["version-update:semver-major"]

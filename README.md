@@ -5,7 +5,7 @@
 <div align="center">
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-v1.0.0--beta-blue.svg)](https://github.com/wch887292/geo-saa/releases/tag/v1.0.0-beta)
+[![Version](https://img.shields.io/badge/Version-v2.0.0-blue.svg)](https://github.com/wch887292/geo-saa/releases/tag/v2.0.0)
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)]()
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-brightgreen.svg)]()
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D.svg)]()
@@ -18,7 +18,7 @@
 
 ## 🌐 官方站点与关联开源项目
 
-本仓库由 **晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心** 维护，是飞虹智 klAI 开源生态的一部分。
+本仓库由 **晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心** 维护（负责人：吴赐虹），是飞虹智 klAI 开源生态的一部分。
 
 - 🏠 **官方网站**：[https://www.klai.top](https://www.klai.top) — 飞虹智 klAI · 泉州制造业 AI 服务商
 - 📦 **开源矩阵**：[https://www.klai.top/opensource.html](https://www.klai.top/opensource.html) — 全部开源项目一览

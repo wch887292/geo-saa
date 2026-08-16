@@ -1,6 +1,6 @@
 {
   "name": "@wch-klzx/geo-engine",
-  "version": "0.1.1",
+  "version": "2.0.0",
   "description": "GEO/AAO 引擎：九战术内容健康度校验（Princeton KDD 2024）+ 2026 GEO v2 维度（答案前置/事实密度/结构化数据/E-E-A-T）+ AI Agent Optimization AX Score 评估与 llms.txt/agent.json 生成",
   "keywords": [
     "geo",

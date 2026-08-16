@@ -3,7 +3,7 @@
 <div align="center">
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-v1.0.0--beta-blue.svg)](https://github.com/wch887292/geo-saa/releases/tag/v1.0.0-beta)
+[![Version](https://img.shields.io/badge/Version-v2.0.0-blue.svg)](https://github.com/wch887292/geo-saa/releases/tag/v2.0.0)
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)]()
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-brightgreen.svg)]()
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D.svg)]()
@@ -16,7 +16,7 @@ An AI-driven **Generative Engine Optimization (GEO)** platform that helps brands
 
 ## 🌐 Official Site & Related Open-Source Projects
 
-Maintained by **Jinjiang Feihongzhi Technology Enterprise Management Co., Ltd. · Feiyang Qiyuan R&D Center**, part of the Feihongzhi klAI open-source ecosystem.
+Maintained by **Jinjiang Feihongzhi Technology Enterprise Management Co., Ltd. · Feiyang Qiyuan R&D Center** (Lead: Wu Cihong), part of the Feihongzhi klAI open-source ecosystem.
 
 - 🏠 **Official site**: [https://www.klai.top](https://www.klai.top) — Feihongzhi klAI · Quanzhou manufacturing-AI service provider
 - 📦 **Open-source matrix**: [https://www.klai.top/opensource.html](https://www.klai.top/opensource.html)

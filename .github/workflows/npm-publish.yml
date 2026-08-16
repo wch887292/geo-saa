@@ -1,6 +1,6 @@
 name: Publish npm
 
-# 打 tag v*（如 v0.1.0）时自动发布 @feihong/geo-engine 到 npm
+# 打 tag v*（如 v2.0.0）时自动发布 @wch-klzx/geo-engine 到 npm
 on:
   push:
     tags:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   publish:
-    name: Publish @feihong/geo-engine
+    name: Publish @wch-klzx/geo-engine
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

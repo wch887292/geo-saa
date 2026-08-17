@@ -19,6 +19,7 @@
 - 修复 `CollectorScheduler` 跳过时日志打印 `null` 的误导。
 
 ### 优化（Optimized）
+- **Spring Boot 4 升级**：parent `3.2.12 → 4.0.7`（Spring Framework 7.0.8 / Tomcat 11.0.22 / Jackson 3.x）；MyBatis-Plus starter 切至 `mybatis-plus-spring-boot4-starter`；`spring-boot-starter-aop` 替换为 SB4 新名 `spring-boot-starter-aspectj`；`RestTemplateConfig` 去掉被移除的 `RestTemplateBuilder`，改为手动 `SimpleClientHttpRequestFactory` 配置超时；新增 `JacksonConfig` 显式注册 Jackson 2 `ObjectMapper` bean，与 SB4 自动配置的 Jackson 3 共存（避免 Jackson 3.x 包名迁移导致的注入缺失）。运行时验证：`mvn test` 24/24 通过；冒烟 15 接口 15 通过；后端在 JDK 17 下编译/运行正常，无需 Java 21。
 - **依赖安全升级**：Spring Boot `3.2.0 → 3.2.12`（同系安全补丁，修 Spring Framework / Tomcat CVE）；axios 实际解析 `1.19.0`（远超低版本漏洞）。
 - **版本号统一**：前端 / 后端 / geo-engine / 文档 全部对齐至 `v2.0.0`。
 - **文档与署名规范化**：README / CHANGELOG / LICENSE / 社区文件统一署名为 晋江市飞虹智科技企业管理有限公司 · 飞扬企源研发中心（负责人：吴赐虹）。

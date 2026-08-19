@@ -32,9 +32,9 @@ spring:
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
   mvc:
-    # 让未匹配的请求抛 NoHandlerFoundException，由 GlobalExceptionHandler 统一返回 404，
-    # 而不是落到静态资源处理器再被兜底成 500
-    throw-exception-if-no-handler-found: true
+    # 说明：Boot 3.2+ 已移除 throw-exception-if-no-handler-found（Spring 6.1 起默认行为），
+    # 未匹配请求统一抛 NoResourceFoundException/NoHandlerFoundException，
+    # 由 GlobalExceptionHandler 统一返回 JSON 404，不再落到静态资源处理器被兜底成 500。
   web:
     resources:
       add-mappings: false

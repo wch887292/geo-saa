@@ -26,8 +26,21 @@ public class AsyncConfig implements AsyncConfigurer {
 
     public static final String EXECUTOR_NAME = "geoTaskExecutor";
 
+    /**
+     * 唯一线程池实例。
+     *
+     * <p>修复前 {@link #getAsyncExecutor()} 每次都调用 {@link #geoTaskExecutor()} 新建实例，
+     * 导致未显式指定执行器的 {@code @Async} 方法（如审计日志）每次解析都会新建一个线程池，
+     * 线程池数量随方法数增长、空转浪费。这里统一复用同一个实例。
+     */
+    private final ThreadPoolTaskExecutor geoExecutor = createGeoTaskExecutor();
+
     @Bean(name = EXECUTOR_NAME)
     public ThreadPoolTaskExecutor geoTaskExecutor() {
+        return geoExecutor;
+    }
+
+    private static ThreadPoolTaskExecutor createGeoTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         int cores = Runtime.getRuntime().availableProcessors();
         // AI 调用属于 IO 密集型，核心线程数可以高于 CPU 核数
@@ -46,7 +59,7 @@ public class AsyncConfig implements AsyncConfigurer {
 
     @Override
     public Executor getAsyncExecutor() {
-        return geoTaskExecutor();
+        return geoExecutor;
     }
 
     /**

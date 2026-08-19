@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
@@ -17,6 +18,10 @@ import java.util.List;
  * <p>修复前使用 {@code addAllowedOriginPattern("*")} + {@code setAllowCredentials(true)}，
  * 等于允许任意站点携带 Cookie/凭证访问接口，是典型的 CSRF / 凭证泄露面。
  * 现在改为白名单驱动，域名从配置读取，生产环境必须显式指定。
+ *
+ * <p>同时暴露 {@link CorsConfigurationSource} Bean：{@code SecurityConfig} 中通过
+ * {@code .cors(Customizer.withDefaults())} 将其挂进安全过滤器链，否则预检（OPTIONS）
+ * 请求会先被安全链以 401 拒绝，浏览器拿不到 CORS 响应头，跨域调用永远失败。
  */
 @Slf4j
 @Configuration
@@ -32,7 +37,7 @@ public class CorsConfig {
     private long maxAge;
 
     @Bean
-    public CorsFilter corsFilter() {
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
@@ -60,6 +65,11 @@ public class CorsConfig {
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
-        return new CorsFilter(source);
+        return source;
+    }
+
+    @Bean
+    public CorsFilter corsFilter(CorsConfigurationSource corsConfigurationSource) {
+        return new CorsFilter(corsConfigurationSource);
     }
 }

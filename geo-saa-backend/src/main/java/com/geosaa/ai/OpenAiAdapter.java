@@ -28,10 +28,12 @@ public class OpenAiAdapter implements AiAdapter {
 
     /** 带超时配置的 RestTemplate，见 {@link com.geosaa.config.RestTemplateConfig} */
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /** 共享 Jackson 2 ObjectMapper（见 {@link com.geosaa.config.JacksonConfig}），不复用则每次 new 独立实例 */
+    private final ObjectMapper objectMapper;
 
-    public OpenAiAdapter(@Qualifier("aiRestTemplate") RestTemplate restTemplate) {
+    public OpenAiAdapter(@Qualifier("aiRestTemplate") RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Override

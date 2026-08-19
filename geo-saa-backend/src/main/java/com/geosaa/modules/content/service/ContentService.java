@@ -46,10 +46,15 @@ public class ContentService {
         return selfProvider.getObject();
     }
 
-    // 敏感词库
-    private static final List<String> SENSITIVE_WORDS = Arrays.asList(
-        "敏感词1", "敏感词2", "违法内容", "赌博", "色情", "暴力"
-    );
+    /**
+     * 敏感词库（可配置）。
+     *
+     * <p>修复前是写死的占位词（“敏感词1/敏感词2”），形同虚设。
+     * 现在支持通过 {@code app.content.sensitive-words}（逗号分隔）覆盖默认词表。
+     */
+    @org.springframework.beans.factory.annotation.Value(
+            "${app.content.sensitive-words:违法内容,赌博,色情,暴力,毒品,诈骗,传销,枪支弹药,代开发票}")
+    private List<String> sensitiveWords;
 
     // 行业模板
     private static final Map<String, String> INDUSTRY_TEMPLATES = new LinkedHashMap<>();
@@ -237,7 +242,7 @@ public class ContentService {
         if (content == null || content.isEmpty()) {
             return null;
         }
-        for (String word : SENSITIVE_WORDS) {
+        for (String word : sensitiveWords) {
             if (content.contains(word)) {
                 log.warn("内容包含敏感词: {}", word);
                 return "内容包含敏感词汇: " + word;

@@ -119,7 +119,7 @@ public class DistributeService {
     public void cancelTask(Long id) {
         DistributeTask task = distributeTaskMapper.selectById(id);
         if (task != null) {
-            task.setStatus(3);
+            task.setStatus(Constant.TASK_STATUS_FAILED);
             distributeTaskMapper.updateById(task);
             taskProgressService.failProgress("distribute:" + id, "任务已取消");
         }

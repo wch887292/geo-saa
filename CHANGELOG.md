@@ -2,6 +2,22 @@
 
 本文件记录 GEO-SaaS 各版本的显著变更。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased] — 2026-08
+
+本轮为工作区修复 + 系统性优化（尚未发布，随下个版本号合并）。
+
+### 修复（Fixed）
+- **恢复 8 个被误删的配置类**：`SecurityConfig`（JWT 安全链 / 方法级鉴权 / 统一 JSON 401/403）、`RabbitMqConfig`（队列/交换机声明，被两个 MQ 监听器与 Service 引用）、`AsyncConfig`、`CorsConfig`、`RedisConfig`、`MybatisPlusConfig`（分页拦截器）、`PasswordEncoderConfig`。此前这些类被删除但代码仍引用，后端无法编译、认证/跨域/异步/分页全部失效；`WebMvcConfig` 为空壳且无引用，保持删除。
+- **统一任务状态语义**：`ContentMessageListener`、`DistributeMessageListener`、`DistributeService.cancelTask` 硬编码的 `1/2/3` 改为引用 `Constant.TASK_STATUS_*`，消除与 `Constant` 两套状态语义的隐患。
+- **敏感词库去占位化**：`ContentService` 中写死的占位词（“敏感词1/敏感词2”）改为可通过 `app.content.sensitive-words` 配置的真实默认词表。
+- **`.env` 变量名对齐**：`RABBITMQ_PASS` → `RABBITMQ_PASSWORD`（与 docker-compose / 后端读取一致，需在部署机上同步修改本地 `.env`）。
+
+### 优化（Optimized）
+- **CORS 挂入 Spring Security 链**：`CorsConfig` 暴露 `CorsConfigurationSource` Bean，`SecurityConfig` 通过 `.cors(Customizer.withDefaults())` 启用，修复跨域预检（OPTIONS）被安全链以 401 拒绝的问题。
+- **异步线程池单例化**：`AsyncConfig.getAsyncExecutor()` 不再每次调用新建线程池实例，未指定执行器的 `@Async` 方法（如审计日志）统一复用同一线程池。
+- **共享 ObjectMapper**：`OpenAiAdapter` 改为注入 `JacksonConfig` 提供的共享 Jackson 2 `ObjectMapper`，不再各自 `new` 独立实例。
+- **清理 Spring Boot 4 死配置**：移除 Boot 3.2 起已不生效的 `spring.mvc.throw-exception-if-no-handler-found`（404 由 `GlobalExceptionHandler` 统一处理）。
+
 ## [v2.0.0] — 2026-08
 
 首个正式稳定版（Stable）。在 v1.0.0-beta 基础上完成安全加固、版本统一与文档规范化。

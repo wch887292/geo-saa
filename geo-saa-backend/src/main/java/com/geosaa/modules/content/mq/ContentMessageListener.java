@@ -2,6 +2,7 @@ package com.geosaa.modules.content.mq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geosaa.ai.AiAdapterFactory;
+import com.geosaa.common.Constant;
 import com.geosaa.config.RabbitMqConfig;
 import com.geosaa.modules.content.entity.AiArticleContent;
 import com.geosaa.modules.content.mapper.AiArticleContentMapper;
@@ -44,7 +45,7 @@ public class ContentMessageListener {
             }
 
             // 更新状态为生成中
-            content.setStatus(1);
+            content.setStatus(Constant.TASK_STATUS_PROCESSING);
             articleContentMapper.updateById(content);
 
             // 调用 AI 生成内容
@@ -70,7 +71,7 @@ public class ContentMessageListener {
                 content.setContent(result);
             }
 
-            content.setStatus(2); // 已完成
+            content.setStatus(Constant.TASK_STATUS_COMPLETED); // 已完成
             articleContentMapper.updateById(content);
             log.info("内容生成完成: contentId={}, title={}", contentId, content.getTitle());
 

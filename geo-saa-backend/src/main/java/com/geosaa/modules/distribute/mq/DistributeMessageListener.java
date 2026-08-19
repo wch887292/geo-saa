@@ -1,6 +1,7 @@
 package com.geosaa.modules.distribute.mq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geosaa.common.Constant;
 import com.geosaa.config.RabbitMqConfig;
 import com.geosaa.modules.common.TaskProgressService;
 import com.geosaa.modules.distribute.entity.DistributeTask;
@@ -43,7 +44,7 @@ public class DistributeMessageListener {
             }
 
             // 更新状态为处理中
-            task.setStatus(1);
+            task.setStatus(Constant.TASK_STATUS_PROCESSING);
             distributeTaskMapper.updateById(task);
             taskProgressService.updateProgress("distribute:" + taskId, 1, "正在分发到" + platform);
 
@@ -55,7 +56,7 @@ public class DistributeMessageListener {
             Thread.sleep(1000);
 
             // 分发完成
-            task.setStatus(2); // 已完成
+            task.setStatus(Constant.TASK_STATUS_COMPLETED); // 已完成
             task.setPublishTime(LocalDateTime.now());
             task.setResultInfo("分发成功: 平台=" + platform + ", 账号=" + account);
             distributeTaskMapper.updateById(task);
@@ -71,7 +72,7 @@ public class DistributeMessageListener {
                     Long taskId = Long.valueOf(msgMap.get("taskId").toString());
                     DistributeTask task = distributeTaskMapper.selectById(taskId);
                     if (task != null) {
-                        task.setStatus(3); // 失败
+                        task.setStatus(Constant.TASK_STATUS_FAILED); // 失败
                         task.setResultInfo("分发失败: " + e.getMessage());
                         distributeTaskMapper.updateById(task);
                     }

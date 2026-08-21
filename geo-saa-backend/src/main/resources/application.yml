@@ -8,6 +8,9 @@ spring:
     allow-circular-references: false
   application:
     name: geo-saa-backend
+  # 支持加载项目根目录 .env 文件
+  config:
+    import: optional:file:../.env[.properties]
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   datasource:

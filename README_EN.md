@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-v2.0.0-blue.svg)](https://github.com/wch887292/geo-saa/releases/tag/v2.0.0)
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)]()
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-brightgreen.svg)]()
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen.svg)]()
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D.svg)]()
 
 </div>
@@ -54,19 +54,19 @@ Maintained by **Jinjiang Feihongzhi Technology Enterprise Management Co., Ltd. �
 | Layer | Technology |
 |------|------|
 | Frontend | Vue 3 + Vite + Element Plus + ECharts + Pinia |
-| Backend | Spring Boot 3.2 + Spring Security + MyBatis-Plus |
-| Database | MySQL 8.0 + Redis 7 |
+| Backend | Spring Boot 4.1 + Spring Security + MyBatis-Plus |
+| Database | MySQL 8.0 + Redis 5+ |
 | Build | Maven 3.9 + npm |
-| Runtime | JDK 17 + Node.js 18+ |
+| Runtime | JDK 17 + Node.js 20.19+ / 22.12+ |
 
 ## Quick Start (Local Dev)
 
 ### Prerequisites
 
 - JDK 17 (Microsoft Build of OpenJDK recommended)
-- Node.js 18+
+- Node.js 20.19+ or 22.12+ (required by Vite 8; older versions fail with crypto.hash unavailable)
 - MySQL 8.0 (running, port 3306)
-- Redis 7 (running, port 6379)
+- Redis 5+ (running, port 6379)
 - Maven 3.9 (optional; scripts handle it)
 
 ### One-click start
@@ -130,17 +130,63 @@ Frontend starts at `http://localhost:3000`; Vite proxies `/api` to the backend.
 - Docker 24+
 - Docker Compose 2+
 
-### Start
-
-```powershell
-.\deploy.ps1
-```
-
-Or manually:
+### Step 0: Preflight check (don't skip)
 
 ```bash
+bash scripts/preflight.sh          # Linux/macOS/Git Bash
+.\scripts\preflight.ps1           # Windows PowerShell
+```
+
+Reports everything missing in one pass: Docker installed?, **daemon running?**,
+ports free?, `.env` complete?, JWT secret strong enough? 90% of "deployment failed"
+reports are one of these.
+
+### Step 1: Change the default password on first deploy ⚠️
+
+The `admin / admin123` account seeded by `init.sql` has its BCrypt hash **committed
+in a public repository** — that is a leaked credential. In the `prod` profile the
+backend refuses to start while the stored hash still matches the default.
+**Skip this and the containers won't start** — it is not optional.
+
+```bash
+# 0) Start MySQL alone first and wait until healthy (the exec below needs the DB up;
+#    the backend staying down at this point is the guard working as intended)
+docker compose up -d mysql
+docker compose ps mysql        # continue once Status shows healthy
+
+# 1) Generate a BCrypt hash (plaintext stays in your terminal; pip install bcrypt first)
+python -c "import bcrypt;print(bcrypt.hashpw(b'your-new-password',bcrypt.gensalt(10)).decode())"
+
+# 2) Put it into <NEW_BCRYPT_HASH> in scripts/change_password.sql, then run
+docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" geo_saa' \
+  < scripts/change_password.sql
+```
+
+For local demos where you accept the risk, set `DEFAULT_PASSWORD_ACTION=disabled` in `.env`.
+
+### Step 2: Start
+
+```bash
+bash scripts/deploy.sh            # Linux/macOS/Git Bash (generates random secrets)
+.\scripts\deploy.ps1               # Windows PowerShell
+```
+
+Or manually (prepare `.env` yourself):
+
+```bash
+cp .env.example .env    # fill in JWT_SECRET / MYSQL_PASSWORD etc.
 docker compose up -d --build
 ```
+
+### Step 3: Verify
+
+```bash
+bash scripts/healthcheck.sh       # or .\scripts\healthcheck.ps1
+```
+
+Covers container state, health endpoints, login, auth boundaries, core APIs, and
+regression-checks the fixed defects (batch generate no longer 500, duplicate submit
+returns 400, wrong password returns 401).
 
 ### Access
 
@@ -149,7 +195,7 @@ docker compose up -d --build
 | Frontend | `http://localhost` |
 | Backend API | `http://localhost:8080` |
 | RabbitMQ management | `http://localhost:15672` (guest/guest) |
-| Default admin | `admin` / `admin123` |
+| Default admin | `admin` / `admin123` — **local demo only, change it in production** |
 
 ## Project Structure
 
@@ -259,7 +305,16 @@ ai:
 ### Dev mode
 
 - RabbitMQ disabled by default (core features unaffected)
-- Default DB credentials: `root` / `root`
+- Dev DB credentials: `root` / `root`
+  - Sourced from `MYSQL_USER` / `MYSQL_PASSWORD` in `.env`. `.env.example` ships this
+    dev default, so `cp .env.example .env` is enough to start.
+  - **These values are for local development only.** Change them to a strong password
+    before production: docker-compose.yml consumes `${MYSQL_PASSWORD}` with no default,
+    so edit `.env` and restart the `mysql` container to apply.
+  - Note that `application-dev.yml` contains **no datasource section** (when no local
+    MySQL is running, `.env` alone suffices). Datasource is configured only in
+    `application-prod.yml`, entirely via `${...}` variable references — missing
+    values fail startup immediately.
 - Log level: `com.geosaa: debug`
 
 ## FAQ
@@ -272,7 +327,12 @@ Stop-Process -Id <PID> -Force
 ```
 
 ### Q: Database connection failed
-A: Ensure MySQL is running, credentials `root/root`, or edit `application-dev.yml`.
+A: First confirm the MySQL container is up (`docker compose ps`), then check
+`MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_USER` / `MYSQL_PASSWORD` in `.env`.
+With Docker, `MYSQL_HOST` should be `mysql` (the service name), not `localhost`;
+use `localhost` only for a local MySQL, in which case add the config under
+`spring.datasource` in `application-dev.yml` — that section is intentionally
+absent by default.
 
 ### Q: Frontend can't reach backend API
 A: Check Vite proxy config `vite.config.js`; ensure `target` points to the correct backend.

@@ -1,44 +1,16 @@
-# GEO-SaaS 平台部署脚本 (Windows)
-Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "  GEO-SaaS 全域AI搜索优化平台 部署脚本" -ForegroundColor Cyan
-Write-Host "=========================================" -ForegroundColor Cyan
+﻿#Requires -Version 5.1
+<#
+    已移至 scripts/deploy.ps1
 
-# 检查 Docker
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Host "错误: Docker 未安装" -ForegroundColor Red
-    exit 1
-}
-
-# 检查 docker-compose
-$COMPOSE_CMD = "docker-compose"
-if (-not (Get-Command docker-compose -ErrorAction SilentlyContinue)) {
-    Write-Host "docker-compose 未找到，尝试 docker compose" -ForegroundColor Yellow
-    $COMPOSE_CMD = "docker compose"
-}
-
-Write-Host "[1/4] 构建后端项目" -ForegroundColor Green
-Push-Location geo-saa-backend
-if (Get-Command mvn -ErrorAction SilentlyContinue) {
-    mvn clean package -DskipTests
-} else {
-    Write-Host "Maven 未安装，使用 Docker 编译" -ForegroundColor Yellow
-    docker run --rm -v "${PWD}:/app" -w /app maven:3.9-openjdk-17 mvn clean package -DskipTests
-}
-Pop-Location
-
-Write-Host "[2/4] 构建并启动所有服务" -ForegroundColor Green
-Invoke-Expression "$COMPOSE_CMD up -d --build"
-
-Write-Host "[3/4] 等待服务启动" -ForegroundColor Green
-Write-Host "等待数据库初始化..." -ForegroundColor Yellow
-Start-Sleep -Seconds 15
-
-Write-Host "[4/4] 部署完成" -ForegroundColor Green
-Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "  前端地址: http://localhost" -ForegroundColor Green
-Write-Host "  后端地址: http://localhost:8080" -ForegroundColor Green
-Write-Host "  RabbitMQ管理: http://localhost:15672" -ForegroundColor Green
-Write-Host ""
-Write-Host "  默认管理员账号: admin" -ForegroundColor Yellow
-Write-Host "  默认管理员密码: admin123" -ForegroundColor Yellow
-Write-Host "=========================================" -ForegroundColor Cyan
+    本文件仅为兼容旧文档/旧习惯保留，实际逻辑在 scripts/deploy.ps1。
+    与旧版的差别（重要）：
+      - 旧版先 mvn package 再交给 compose 重复构建一次，白白多花几分钟
+      - 旧版不生成 .env，JWT_SECRET 缺失会导致后端 fail-fast 起不来
+      - 旧版固定用 docker-compose（v1），现已统一 v2 语法
+      - 旧版固定 Start-Sleep 15 就宣称"部署完成"，不检查健康状态
+#>
+$ErrorActionPreference = 'Stop'
+Set-Location (Split-Path -Parent $PSScriptRoot)
+Write-Host '提示：已转发到 scripts\deploy.ps1' -ForegroundColor Cyan
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'scripts\deploy.ps1') @args
+exit $LASTEXITCODE

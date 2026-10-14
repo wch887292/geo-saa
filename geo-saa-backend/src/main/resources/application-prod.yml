@@ -13,6 +13,13 @@ cors:
   # 生产环境必须显式指定前端域名，禁止通配
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
+app:
+  security:
+    # 生产环境安全闸门：init.sql 内置的管理员默认口令公开存在于仓库，
+    # 等同于凭据泄露。检测到仍是默认口令将直接拒绝启动，
+    # 改密后启动；确实需要临时放行时显式设置 DEFAULT_PASSWORD_ACTION=disabled。
+    default-password-action: ${DEFAULT_PASSWORD_ACTION:fail}
+
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl

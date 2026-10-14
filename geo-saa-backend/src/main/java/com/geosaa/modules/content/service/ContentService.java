@@ -15,6 +15,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -147,6 +148,7 @@ public class ContentService {
             message.put("contentType", request.getContentType());
             message.put("wordCount", 1000);
             message.put("userId", userId);
+            boolean published = false;
             if (rabbitTemplate != null) {
                 try {
                     rabbitTemplate.convertAndSend(
@@ -154,11 +156,23 @@ public class ContentService {
                         RabbitMqConfig.ROUTING_KEY_CONTENT_GENERATE,
                         objectMapper.writeValueAsString(message)
                     );
+                    published = true;
                 } catch (JsonProcessingException e) {
-                    log.error("序列化消息失败", e);
+                    log.error("序列化消息失败: contentId={}", content.getId(), e);
+                } catch (AmqpException e) {
+                    // RabbitTemplate Bean 可能存在但 broker 不可达（如 MQ 未启动、端口被墙、中途宕机）。
+                    // 修复前这类异常直接冒泡成 500，且 content 记录永远停在 PENDING，无人重试——
+                    // 表现为“批量生成提交成功但内容永远生成不出来”的静默数据黑洞。
+                    log.warn("RabbitMQ 不可达，降级为本地异步生成: contentId={}, 原因={}",
+                            content.getId(), e.getMessage());
                 }
             } else {
-                log.warn("RabbitMQ 未启用，内容生成消息已跳过");
+                log.warn("RabbitMQ 未启用，降级为本地异步生成: contentId={}", content.getId());
+            }
+
+            // 未成功入队时必须走本地生成兜底，绝不留下孤儿 PENDING 记录
+            if (!published) {
+                self().asyncGenerateArticle(content.getId());
             }
         }
         log.info("批量生成文章: count={}, userId={}", requests.size(), userId);
@@ -184,6 +198,23 @@ public class ContentService {
             self().asyncGenerateScript(content.getId(), request.getTitle(), request.getBrandName(), request.getKeywords());
             return content;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 异步生成文章（MQ 不可用时的降级路径）。
+     *
+     * <p>修复前批量生成在无 RabbitMQ 环境下只能「跳过」，内容记录永久停留
+     * {@link Constant#TASK_STATUS_PENDING}，形成静默数据黑洞。现在作为兜底路径
+     * 复用同步生成逻辑（{@link #generateWithAi}），只是放到有界线程池里执行以免阻塞请求线程。
+     */
+    @Async(com.geosaa.config.AsyncConfig.EXECUTOR_NAME)
+    public void asyncGenerateArticle(Long contentId) {
+        try {
+            generateWithAi(contentId);
+        } catch (Exception e) {
+            log.error("MQ 降级生成失败: contentId={}", contentId, e);
+            updateStatus(contentId, Constant.TASK_STATUS_FAILED);
+        }
     }
 
     /**

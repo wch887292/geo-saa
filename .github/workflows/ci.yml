@@ -38,7 +38,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          # Vite 8 要求 Node 20.19+ / 22.12+，低版本构建时报 crypto.hash 不可用
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: geo-saa-frontend/package-lock.json
       - name: Install & build (lockfile-pinned)

@@ -1,0 +1,100 @@
+name: Docker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # 允许手动触发：本机Docker daemon 常因 WSL2 不可用而无法实测，
+  # CI runner 自带 daemon，是唯一能自动验证部署路径的地方。
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------- compose 配置校验：不启动容器，秒级完成 ----------
+  # 能在提交阶段就拦住变量缺失、YAML 缩进错误、profile拼写错误等问题，
+  # 比等到 docker compose up 才发现要快得多。
+  compose-validate:
+    name: Compose config validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fill placeholder env vars
+        # compose 里 JWT_SECRET / CORS_ALLOWED_ORIGINS / MYSQL_PASSWORD /
+        # RABBITMQ_PASSWORD 用 `:?` 语法（缺失即报错）。校验时提供占位值。
+        run: |
+          cp .env.example .env
+          {
+            echo "JWT_SECRET=$(openssl rand -base64 32)"
+            echo "CORS_ALLOWED_ORIGINS=http://localhost"
+            echo "MYSQL_PASSWORD=ci-placeholder-password"
+            echo "RABBITMQ_PASSWORD=ci-placeholder-password"
+          } >> .env
+      - name: Validate compose file
+        run: docker compose --env-file .env config --quiet
+      - name: Show resolved services
+        run: docker compose --env-file .env config --services
+      - name: Ensure .env is never committed
+        run: |
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::.env 被纳入了版本管理，凭据会泄露"; exit 1
+          fi
+          echo "OK: .env 未入库（.gitignore 生效）"
+
+  # ---------- 镜像构建：验证 Dockerfile 真的能build ----------
+  # 这一步能捕获本次修复的三个真实缺陷：
+  #  - node:18 + Vite 8 的 Node 版本不匹配
+  #  - npm ci 在 linux 上漏装 rollup 原生模块
+  #  - COPY 一个不存在的 jar 名
+  docker-build:
+    name: Build images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./geo-saa-backend
+          file: ./geo-saa-backend/docker/Dockerfile
+          push: false
+          load: true
+          tags: geo-saa-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./geo-saa-frontend
+          file: ./geo-saa-frontend/Dockerfile
+          push: false
+          load: true
+          tags: geo-saa-frontend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify images & health probe
+        run: |
+          docker images | grep -E 'geo-saa-(backend|frontend)'
+          # 探针类必须随镜像产出，且能在无后端时正确判定 unhealthy
+          docker run --rm --entrypoint sh geo-saa-backend:ci -c \
+            'test -f /app/app.jar && test -f /app/probe.jar && echo "jar + probe present"'
+          # 无后端运行时探针应返回 1（unhealthy），不是永远 0 也不是永远挂起
+          docker run --rm --entrypoint sh geo-saa-backend:ci -c \
+            'java -cp probe.jar HealthProbe; code=$?; \
+             if [ "$code" -eq 1 ]; then echo "OK: 无后端时探针判定 unhealthy"; \
+             else echo "::error::探针在无后端时返回 $code，应为 1"; exit 1; fi'
+      - name: Inspect healthcheck config
+        run: |
+          # 镜像内必须自带 HEALTHCHECK，否则 compose 里的定义之外没有兜底
+          docker inspect geo-saa-backend:ci --format '{{json .Config.Healthcheck}}' | tee /dev/stderr | grep -q 'HealthProbe' \
+            || { echo "::error::backend 镜像未声明含 HealthProbe 的 HEALTHCHECK"; exit 1; }
+          docker inspect geo-saa-frontend:ci --format '{{json .Config.Healthcheck}}' | tee /dev/stderr | grep -q 'healthz' \
+            || { echo "::error::frontend 镜像未声明 healthz HEALTHCHECK"; exit 1; }
+          echo "OK: 两个镜像均声明了 HEALTHCHECK"

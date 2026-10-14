@@ -8,8 +8,17 @@
 - Base URL: `/api/v1`
 - 认证方式: `Authorization: Bearer {token}`（JWT，登录后获取）
 - 响应格式: `{ code: int, message: string, data: object }`，成功 `code=200`；鉴权失败 `401`；业务错误 `400/500`
-- 分页接口: 通用 `{ records[], total, size, current }` 结构
+- **分页接口**：返回 `PageResult` 信封，形如
+  `{ code, message, data: T[], total, pageSize, pageNum, pages }`
+  —— 注意分页字段与 `data` **平级**，`data` 直接是记录数组（**没有 `records` 包装层**），
+  这与普通接口的 `data` 可能为对象不同。分页参数统一为 `pageNum` / `pageSize`（均从 1 开始）。
+  涉及接口：`asset/list`、`content/list`、`diagnose/list`、`distribute/list`、
+  `knowledge/brands`、`monitor/list`、`system/audit-log`。
 - 免鉴权接口: `POST /auth/login`、`POST /auth/refresh`、`GET /system/health`
+
+> 校订说明：早期版本本文档写作 `{ records[], total, size, current }`，
+> 与 `com.geosaa.common.PageResult` 的实际序列化结果不符（`records` 键并不存在），
+> 按文档写解析代码会取到 `undefined`。此处已与实现对齐。
 
 ## 认证接口 `/auth`
 

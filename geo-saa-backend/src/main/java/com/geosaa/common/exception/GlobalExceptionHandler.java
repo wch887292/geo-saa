@@ -3,6 +3,8 @@ package com.geosaa.common.exception;
 import com.geosaa.common.Result;
 import jakarta.validation.ValidationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.AmqpException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -96,6 +98,59 @@ public class GlobalExceptionHandler {
     public Result<Void> handleNotFound(Exception e) {
         log.warn("接口不存在: {}", e.getMessage());
         return Result.error(404, "请求的接口不存在");
+    }
+
+    /**
+     * 数据库约束冲突（唯一键重复、外键约束、非空约束）。
+     *
+     * <p>修复前这类异常会掉进最下面的 {@code Exception} 兜底分支：重复创建同名品牌、
+     * 重复提交同名角色等正常业务冲突，一律返回 {@code 500服务器内部错误}，
+     * 既误导前端（前端无法给出“已存在”这类可读提示），又污染错误日志与告警。
+     * 现在按 400 业务错误返回，并把底层 SQL 细节收敛掉，只暴露可读原因。
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        String rootMsg = extractRootMessage(e);
+        log.warn("数据约束冲突: {}", rootMsg);
+        String lower = rootMsg.toLowerCase(java.util.Locale.ROOT);
+        String friendly;
+        if (lower.contains("duplicate entry") || lower.contains("duplicate")) {
+            friendly = "记录已存在，请勿重复提交";
+        } else if (lower.contains("cannot be null")) {
+            friendly = "存在必填字段未填写";
+        } else {
+            friendly = "数据写入失败，请检查输入是否重复或格式是否正确";
+        }
+        return Result.error(400, friendly);
+    }
+
+    /**
+     * 消息队列不可用。
+     *
+     * <p>业务层已对 MQ 不可达做了降级兜底，这里只兜住漏网场景（例如同步调用 AI 网关
+     * 之外的路径），返回 503 让上游明确知道是依赖不可用，而不是"服务器崩了"。
+     */
+    @ExceptionHandler(AmqpException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public Result<Void> handleAmqpException(AmqpException e) {
+        log.error("消息队列不可用: {}", e.getMessage());
+        return Result.error(503, "任务队列暂时不可用，请稍后重试");
+    }
+
+    /**
+     * 从异常链中提取最底层的原因信息。
+     */
+    private String extractRootMessage(Throwable e) {
+        Throwable cur = e;
+        String last = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+        while (cur != null) {
+            if (cur.getMessage() != null && !cur.getMessage().isBlank()) {
+                last = cur.getMessage();
+            }
+            cur = cur.getCause();
+        }
+        return last == null ? "" : last;
     }
 
     @ExceptionHandler(Exception.class)

@@ -2,6 +2,42 @@
 
 本文件记录 GEO-SaaS 各版本的显著变更。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased] — 2026-10
+
+本轮为一次完整的落地测试评估 + 针对性加固。全部变更均经过实机验证（单元 47/47、冒烟 15/15、功能 17/18、PowerShell 验收 13/13），尚未发布，随下个版本号合并。
+
+### 安全（Security）
+
+- **默认管理员口令闸门**：新增 `DefaultPasswordGuard`（`ApplicationRunner`，在端口对外服务前执行）。`init.sql` 内置的管理员口令散列固定写在公开仓库中，等同凭据泄露——任何按文档部署的人都拿同一份凭据，公网扫描器可直接登录后台。现在 `prod` 档案检测到口令仍是默认值时**直接拒绝启动**并打印改密指引；`dev` 档案降级为告警，不影响本地开发。可用 `DEFAULT_PASSWORD_ACTION=disabled` 显式放行（自行承担风险）。
+  - 识别方式为「字面量比对 + `PasswordEncoder.matches` 兜底」：BCrypt 每次加盐结果都不同，只比字面量会在 init.sql 重新生成散列后静默失效；兜底比对能识别换盐后的同一默认口令。空散列视为命中（比默认口令更危险）。非法散列格式不抛异常，避免误伤。
+  - 选择「显式失败」而非「自动生成随机密码」：自动改密会把新密码打进启动日志，而日志通常被收集到集中式日志平台，等于把凭据换个地方再泄露一次，且用户往往注意不到。
+- **改密助手** `scripts/change_password.sql`：给出 BCrypt 散列的本地生成方式（明文不经过任何在线服务与 CI 日志）与执行命令。
+
+### 修复（Fixed）
+
+- **批量生成接口 500**：dev 档案的 AMQP 自动配置 exclude 沿用 Spring Boot 3 的旧全限定名，在 Boot 4.1 下该类已不存在，Spring 静默忽略无效 exclude 导致 `RabbitTemplate` 仍被创建；本机无 RabbitMQ 时 `convertAndSend` 抛 `AmqpConnectException`，`POST /api/v1/content/batch-generate` 与分发接口直接 500。改用 Boot 4 正确类名，并在 Service 层捕获 `AmqpException` 后本地降级执行（不再留下PENDING 孤儿记录）。实测返回 200。
+- **唯一约束冲突返回 500**：重复创建同名品牌时原始 SQL 异常未被友好包装，前端只能显示「服务器内部错误」。`GlobalExceptionHandler` 新增 `DataIntegrityViolationException` → 400 +「记录已存在，请勿重复提交」。
+- **鉴权失败仍返回 HTTP 200**：登录失败时 HTTP 状态码是 200、错误码只在 body 里，导致监控与网关无法识别爆破行为。改为真正的 HTTP 401。
+- **登录无防爆破**：新增 IP 维度滑动窗口限流（20 次/15 分钟）。原实现只按用户名计数，既挡不住「同一批密码遍历大量用户名」的撞库，反过来只要知道某个存在的用户名就能 5 次错误把账号锁死 30 分钟。IP 配额独立于账号锁定，只在登录成功时回收（否则攻击者可用一次成功登录重置撞库进度）。
+- **资产统计口径混淆**：`/api/v1/asset/overview` 的 `knowledgeTotal` 统计的是 `brand_knowledge` 表（知识库条目），但字段名容易被理解成品牌数——新增品牌后该值仍为 0 而 `totalAssets` 有值，看起来像 bug。新增 `brandTotal` 字段独立返回 `brand_info` 表计数，`byType` 同步增加 `brand` 键，`totalAssets` 语义不变。
+
+### 新增（Added）
+
+- **环境就绪预检** `scripts/preflight.sh` / `preflight.ps1`：部署前一次性列出缺什么、为什么缺、怎么补——Docker 是否安装、**daemon 是否启动**（最常见的坑）、端口占用、`.env` 必填项、JWT 强度（Base64 解码后 ≥ 32 字节）、CORS 通配符、默认口令守卫状态、磁盘与内存余量。支持 `--docker`（默认）/ `--local`（JDK/Maven/Node/MySQL/Redis 源码模式）/ `--all`。退出码非 0 表示未就绪。
+- **PowerShell 部署与验收脚本** `scripts/deploy.ps1` / `healthcheck.ps1`：此前 Windows 用户必须装 Git Bash 或 WSL 才能用 bash 脚本。两个新脚本与 bash 版行为等价，含随机密钥生成、`.env` ACL 收紧、健康轮询、以及对已修复缺陷的回归验证。
+- **回归测试 4 → 47 项**：新增 `ContentServiceBatchGenerateTest`、`GlobalExceptionHandlerTest`、`AuthServiceRateLimitTest`、`AssetServiceOverviewTest`、`DefaultPasswordGuardTest` 等，覆盖批量生成降级、异常状态码映射、登录限流、资产统计口径、默认口令守卫（含换盐识别、空散列、非法散列容错、空库跳过）。
+
+### 变更（Changed）
+
+- **部署文档去除「待验证」自述**：`docs/DOCKER_COMPOSE_TEST.md` 原开头写「状态：待环境验证」，会让读者质疑整条部署路径。改为准确区分「已验证」与「待验证」两个层次——编排配置已通过静态审查 + CI 构建，后端全链路已在等价配置（MySQL 8 + Redis 5，非容器）实测通过；唯一未覆盖的是 `docker compose up` 本身，并给出执行后的回填指引。
+- **重复的部署脚本收敛**：根目录 `deploy.sh` / `deploy.ps1` 改为转发到 `scripts/` 下的规范版本。旧版会先 `mvn package` 再交给 compose 重复构建一次（白白多花几分钟），不生成 `.env`（`JWT_SECRET` 缺失导致后端 fail-fast 起不来），固定用 docker-compose v1，且 `sleep 15` 就宣称「部署完成」而不检查健康状态。
+- **版本标注对齐实际**：`README` / `README_EN` 通篇写 Spring Boot 3.2、Redis 7，实际 `pom.xml` 为 Spring Boot 4.1、Redis 5+。
+- **默认口令的文档表述统一**：README / README_EN / FAQ_EN / 部署指南统一标注为「仅本地演示，生产必须改密」，并链接到改密步骤。
+
+### 修复之外的一处观察
+
+`init.sql` 的默认口令散列与早期文档中标注的明文曾存在不一致（README 写 `admin/admin123`，另一处注释写不同值）。实测确认 init.sql 中散列对应的明文为 `admin123`，所有文档已按此统一。
+
 ## [Unreleased] — 2026-08
 
 本轮为工作区修复 + 系统性优化（尚未发布，随下个版本号合并）。

@@ -11,7 +11,9 @@ import com.geosaa.modules.diagnose.entity.AiDiagnoseTask;
 import com.geosaa.modules.diagnose.mapper.AiDiagnoseTaskMapper;
 import com.geosaa.modules.distribute.entity.DistributeTask;
 import com.geosaa.modules.distribute.mapper.DistributeTaskMapper;
+import com.geosaa.modules.knowledge.entity.BrandInfo;
 import com.geosaa.modules.knowledge.entity.BrandKnowledge;
+import com.geosaa.modules.knowledge.mapper.BrandInfoMapper;
 import com.geosaa.modules.knowledge.mapper.BrandKnowledgeMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +42,7 @@ public class AssetService {
     private final AiArticleContentMapper contentMapper;
     private final DistributeTaskMapper distributeTaskMapper;
     private final BrandKnowledgeMapper knowledgeMapper;
+    private final BrandInfoMapper brandInfoMapper;
     private final AiDiagnoseTaskMapper diagnoseTaskMapper;
     private final AssetRecordMapper assetRecordMapper;
 
@@ -65,13 +68,17 @@ public class AssetService {
         Map<String, Object> result = new LinkedHashMap<>();
         long contentTotal = safeCount(contentMapper.selectCount(null));
         long knowledgeTotal = safeCount(knowledgeMapper.selectCount(null));
+        long brandTotal = safeCount(brandInfoMapper.selectCount(null));
         long distributeTotal = safeCount(distributeTaskMapper.selectCount(null));
         long distributeSuccess = safeDistributeSuccess();
         long diagnoseTotal = safeCount(diagnoseTaskMapper.selectCount(null));
         long recordedTotal = safeRecordedCount();
 
         result.put("contentTotal", contentTotal);
+        // knowledgeTotal 统计的是 brand_knowledge 表（知识库内容条目），不是 brand_info（品牌数）。
+        // 品牌数单独用 brandTotal 字段返回，避免前端把"知识库条目"和"品牌"混淆。
         result.put("knowledgeTotal", knowledgeTotal);
+        result.put("brandTotal", brandTotal);
         result.put("distributeTotal", distributeTotal);
         result.put("distributeSuccess", distributeSuccess);
         result.put("diagnoseTotal", diagnoseTotal);
@@ -83,6 +90,7 @@ public class AssetService {
         result.put("screenshots", 0L); // 暂无截图存证独立数据源
 
         Map<String, Long> byType = new LinkedHashMap<>();
+        byType.put("brand", brandTotal);
         byType.put("content", contentTotal);
         byType.put("knowledge", knowledgeTotal);
         byType.put("distribute", distributeTotal);

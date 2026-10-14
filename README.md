@@ -7,8 +7,10 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-v2.0.0-blue.svg)](https://github.com/wch887292/geo-saa/releases/tag/v2.0.0)
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)]()
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-brightgreen.svg)]()
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen.svg)]()
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D.svg)]()
+[![CI](https://github.com/wch887292/geo-saa/actions/workflows/ci.yml/badge.svg)](https://github.com/wch887292/geo-saa/actions/workflows/ci.yml)
+[![Docker](https://github.com/wch887292/geo-saa/actions/workflows/docker.yml/badge.svg)](https://github.com/wch887292/geo-saa/actions/workflows/docker.yml)
 
 </div>
 
@@ -59,19 +61,19 @@
 | 层级 | 技术 |
 |------|------|
 | 前端 | Vue 3 + Vite + Element Plus + ECharts + Pinia |
-| 后端 | Spring Boot 3.2 + Spring Security + MyBatis-Plus |
-| 数据库 | MySQL 8.0 + Redis 7 |
+| 后端 | Spring Boot 4.1 + Spring Security + MyBatis-Plus |
+| 数据库 | MySQL 8.0 + Redis 5+ |
 | 构建 | Maven 3.9 + npm |
-| 运行环境 | JDK 17 + Node.js 18+ |
+| 运行环境 | JDK 17 + Node.js 20.19+ / 22.12+ |
 
 ## 快速开始（本地开发）
 
 ### 前置条件
 
 - JDK 17（推荐 Microsoft Build of OpenJDK）
-- Node.js 18+
+- Node.js 20.19+ 或 22.12+（Vite 8 要求；更低版本构建时报 crypto.hash 不可用）
 - MySQL 8.0（运行中，端口 3306）
-- Redis 7（运行中，端口 6379）
+- Redis 5+（运行中，端口 6379）
 - Maven 3.9（可选，脚本会自动处理）
 
 ### 一键启动
@@ -129,7 +131,7 @@ npx vite --host
 
 - 前端地址: `http://localhost:3000`
 - 后端地址: `http://localhost:8080`
-- 默认管理员: `admin` / `admin123`
+- 默认管理员: `admin` / `admin123`（仅限本地开发，见 [Docker 部署](#docker-部署)的改密说明）
 
 ## Docker 部署
 
@@ -138,17 +140,59 @@ npx vite --host
 - Docker 24+
 - Docker Compose 2+
 
-### 启动
-
-```powershell
-.\deploy.ps1
-```
-
-或手动执行：
+### 第0 步：环境预检（别跳过）
 
 ```bash
+bash scripts/preflight.sh          # Linux/macOS/Git Bash
+.\scripts\preflight.ps1           # Windows PowerShell
+```
+
+一次性列出缺什么：Docker 是否安装、**daemon 是否启动**、端口是否被占、`.env` 是否齐全、
+JWT 强度够不够。90% 的"部署失败"都是这几类原因，先跑这步能省掉大量试错。
+
+### 第 1 步：首次部署必须改密 ⚠️
+
+`init.sql` 注入的管理员 `admin / admin123`，其 BCrypt 散列**固定写在公开仓库里**，
+等同于凭据泄露。后端在生产档案下会检查数据库口令是否仍是默认值，**是则拒绝启动**。
+**这一步不做，容器起不来**——这不是可选项。
+
+```bash
+# 0) 先只起 MySQL 并等它就绪（改密要连库；后端起不来是闸门的预期行为，不用管）
+docker compose up -d mysql
+docker compose ps mysql        # Status 出现 healthy 再继续
+
+# 1) 生成 BCrypt 散列（明文只留在你的终端；需先 pip install bcrypt）
+python -c "import bcrypt;print(bcrypt.hashpw(b'你的新密码',bcrypt.gensalt(10)).decode())"
+
+# 2) 填进 scripts/change_password.sql 的 <NEW_BCRYPT_HASH>，然后执行
+docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" geo_saa' \
+  < scripts/change_password.sql
+```
+
+仅本地演示、明确知道风险时，可在 `.env` 里设 `DEFAULT_PASSWORD_ACTION=disabled` 放行。
+
+### 第 2 步：启动
+
+```bash
+bash scripts/deploy.sh          # Linux/macOS/Git Bash（自动生成随机密钥并校验）
+.\scripts\deploy.ps1                # Windows PowerShell
+```
+
+或手动执行（需自行准备 `.env`）：
+
+```bash
+cp .env.example .env    # 按注释填写 JWT_SECRET / MYSQL_PASSWORD 等
 docker compose up -d --build
 ```
+
+### 第 3 步：验收
+
+```bash
+bash scripts/healthcheck.sh         # 或 .\scripts\healthcheck.ps1
+```
+
+覆盖容器状态、健康端点、登录、鉴权边界、核心业务，并回归验证已修复的缺陷
+（批量生成不再 500、重复提交返回 400、错误密码返回 401）。
 
 ### 访问
 
@@ -157,15 +201,20 @@ docker compose up -d --build
 | 前端 | `http://localhost` |
 | 后端 API | `http://localhost:8080` |
 | RabbitMQ 管理 | `http://localhost:15672` (guest/guest) |
-| 默认管理员 | `admin` / `admin123` |
+| 默认管理员 | `admin` / `admin123` — **仅本地演示，生产必须改密** |
 
 ## 项目结构
 
 ```
 geo-saa/
 ├── start.ps1                  # 一键启动脚本（本地开发）
-├── deploy.ps1                 # Docker 部署脚本
+├── deploy.sh / deploy.ps1     # 兼容入口，转发到 scripts/deploy.*
 ├── docker-compose.yml         # Docker Compose 编排
+├── scripts/                   # 部署与验收脚本
+│   ├── preflight.sh / .ps1    # 环境就绪预检（部署前先跑）
+│   ├── deploy.sh / .ps1       # 一键部署（生成随机密钥 + 健康等待）
+│   ├── healthcheck.sh / .ps1  # 部署验收（含已修复缺陷回归）
+│   └── change_password.sql    # 首次部署改密助手
 ├── geo-saa-backend/           # 后端服务
 │   ├── pom.xml
 │   ├── docker/
@@ -273,7 +322,13 @@ ai:
 ### 开发模式
 
 - RabbitMQ 默认禁用，不影响核心功能
-- 数据库默认凭据: `root` / `root`
+- 数据库开发凭据: `root` / `root`
+  - 来源是 `.env` 的 `MYSQL_USER` / `MYSQL_PASSWORD`，`.env.example` 已预置这组开发默认值，
+    `cp .env.example .env` 后可直接启动。
+  - **这组值只适用于本地开发**。生产部署前必须改成强口令：compose 用的是
+    `${MYSQL_PASSWORD}` 无默认值语法，改完 `.env` 后重启 `mysql` 容器生效。
+  - 注意 `application-dev.yml` **不包含 datasource 段**（无本地 MySQL 时用 `.env` 即可）；
+    datasource 只在 `application-prod.yml` 中配置，且全部为 `${...}` 变量引用、缺失即启动失败。
 - 日志级别: `com.geosaa: debug`
 
 ## 常见问题
@@ -286,7 +341,11 @@ Stop-Process -Id <PID> -Force
 ```
 
 ### Q: 数据库连接失败
-A: 确保 MySQL 已启动，凭据为 `root/root`，或修改 `application-dev.yml` 中的配置。
+A: 先确认 MySQL 容器已启动（`docker compose ps`），再核对 `.env` 里的
+`MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_USER` / `MYSQL_PASSWORD`。
+用 Docker 时 `MYSQL_HOST` 应为 `mysql`（服务名）而非 `localhost`；
+连本机 MySQL 才用 `localhost`，此时需在 `application-dev.yml` 的
+`spring.datasource` 段补充配置——该段默认不存在，属刻意留空。
 
 ### Q: 前端无法访问后端 API
 A: 检查 Vite 代理配置 `vite.config.js`，确保 `target` 指向正确的后端地址。

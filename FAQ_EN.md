@@ -37,7 +37,7 @@ MIT License.
 ### Q: What are the prerequisites for local dev?
 
 - JDK 17
-- Node.js 18+
+- Node.js 20.19+ or 22.12+ (required by Vite 8; older versions fail with crypto.hash unavailable)
 - MySQL 8.0 (running, port 3306)
 - Redis 7 (running, port 6379)
 - Maven 3.9 (scripts can handle it)
@@ -118,7 +118,12 @@ Stop-Process -Id <PID> -Force
 
 ### Q: Database connection failed?
 
-Ensure MySQL is running with credentials `root/root`, or edit `application-dev.yml`.
+First confirm the MySQL container is up (`docker compose ps`), then check
+`MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_USER` / `MYSQL_PASSWORD` in `.env`.
+With Docker, `MYSQL_HOST` should be `mysql` (the service name), not `localhost`;
+use `localhost` only for a local MySQL, in which case add the config under
+`spring.datasource` in `application-dev.yml` — that section is intentionally
+absent by default.
 
 ### Q: Frontend can't reach the backend API?
 
@@ -126,7 +131,9 @@ Check Vite proxy config `vite.config.js`; ensure `target` points to the correct 
 
 ### Q: What are the default DB credentials in dev?
 
-`root` / `root`. Change them for any non-dev environment.
+`root` / `root`, pre-set in `.env.example` (`MYSQL_USER` / `MYSQL_PASSWORD`);
+`cp .env.example .env` is enough to start. **Development only** — set a strong
+password in `.env` before any production deployment.
 
 ---
 

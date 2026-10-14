@@ -1,0 +1,77 @@
+name: Credentials Guard
+
+# 长期防线：防止"改了 init.sql 却忘了同步 DefaultPasswordGuard"这类回归。
+# 历史上真实发生过的问题：
+#  1. README 宣称数据库凭据 root/root，但 application-dev.yml 根本没有 datasource 段、
+#     compose 的 MYSQL_PASSWORD 无默认值、.env.example 密码为空——文档与实现不一致，
+#     新用户照文档配了却起不来；
+#  2. init.sql 的默认口令散列若被重新生成而 Guard 未同步登记，默认口令闸门会静默失效
+#     （prod 不再拒绝启动），且没有任何测试能发现。
+# 本 workflow 用两个只输出布尔结论的脚本把上述不变量固化成 CI 门禁。
+#
+# 安全说明：两个脚本从不打印口令明文或散列，只输出账号/行号/长度/布尔结论。
+# 公开仓库的 CI 日志等同于公开信息，因此这一点比本地运行更重要。
+
+on:
+  push:
+    branches: [main, production-hardening]
+    paths:
+      - 'README.md'
+      - 'README_EN.md'
+      - 'FAQ_EN.md'
+      - '.env.example'
+      - 'docker-compose.yml'
+      - 'verify_creds.py'
+      - 'check_db_creds.py'
+      - 'creds_gate_negtest.py'
+      - '.github/workflows/creds-guard.yml'
+      - 'geo-saa-backend/src/main/resources/db/init.sql'
+      - 'geo-saa-backend/src/main/resources/application-dev.yml'
+      - 'geo-saa-backend/src/main/resources/application-prod.yml'
+      - 'geo-saa-backend/src/main/java/com/geosaa/security/DefaultPasswordGuard.java'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'README_EN.md'
+      - 'FAQ_EN.md'
+      - '.env.example'
+      - 'docker-compose.yml'
+      - 'verify_creds.py'
+      - 'check_db_creds.py'
+      - 'creds_gate_negtest.py'
+      - '.github/workflows/creds-guard.yml'
+      - 'geo-saa-backend/src/main/resources/db/init.sql'
+      - 'geo-saa-backend/src/main/resources/application-dev.yml'
+      - 'geo-saa-backend/src/main/resources/application-prod.yml'
+      - 'geo-saa-backend/src/main/java/com/geosaa/security/DefaultPasswordGuard.java'
+  # 允许手动触发，便于改完文档后不推分支先自查
+  workflow_dispatch:
+
+concurrency:
+  group: creds-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  creds-verify:
+    name: Default credential & docs consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Install bcrypt
+        run: python -m pip install bcrypt
+      # 任一脚本 exit 1 即 job 失败；失败信息含散列未覆盖的账号与行号，可直接定位
+      - name: Verify credential hashes & docs (verify_creds.py)
+        run: python verify_creds.py
+      - name: Verify DB credential sources (check_db_creds.py)
+        run: python check_db_creds.py
+      - name: Self-test the guard (negative tests)
+        # 防止门禁脚本自身被重构改空转：在临时副本里制造 5 类回归
+        # （散列变更未同步 Guard / 删 README 告警 / prod 硬编码 /
+        #  .env 清空 / 英文 FAQ 回归），每类都必须被对应脚本拦截。
+        # 变异只发生在临时目录，不触碰检出。
+        run: python creds_gate_negtest.py

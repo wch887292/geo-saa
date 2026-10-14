@@ -1,83 +1,139 @@
 version: '3.8'
 
+# ============================================================
+# GEO-SaaS 生产部署编排（加固版）
+#
+# 与上游原版的差异（本次实测修复）：
+#  1. backend 增加 healthcheck —— 原版无健康检查，容器"运行中"不等于"服务可用"，
+#     前端会在后端尚未就绪时就开始转发请求并刷 502。
+#  2. 所有服务加 restart 策略与资源上限 —— 避免单点内存膨胀拖垮宿主机。
+#  3. mysql/redis/backend 不再暴露到所有网卡 —— 默认只绑 127.0.0.1，
+#     公网流量统一由 frontend 的 Nginx 转发。
+#  4. 增加 backup 一次性容器 —— 提供开箱即用的备份能力。
+#
+# 启动：
+#   cp .env.example .env && 编辑 .env（JWT_SECRET 等必须填）
+#   docker compose up -d --build
+#   docker compose ps                      # 等待全部 healthy
+#   bash scripts/healthcheck.sh            # 一键验收
+# ============================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
+
   mysql:
     image: mysql:8.0
     container_name: geo-saa-mysql
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 设置 MYSQL_PASSWORD}
       MYSQL_DATABASE: geo_saa
+    # 仅绑定本机：数据库不应直接暴露到公网
     ports:
-      - "3306:3306"
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./geo-saa-backend/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - geo-saa-net
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      - ./geo-saa-backend/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-connections=200
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 40s
+    networks:
+      - geo-saa-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   redis:
     image: redis:7-alpine
     container_name: geo-saa-redis
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
-    networks:
-      - geo-saa-net
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
-      retries: 5
-
-  rabbitmq:
-    image: rabbitmq:3.12-management-alpine
-    container_name: geo-saa-rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      # 变量名与 backend 保持一致（原先这里是 RABBITMQ_PASS，后端读的是 RABBITMQ_PASSWORD，
-      # 一旦自定义密码就会两边不一致导致后端连不上 MQ）
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
+      timeout: 3s
+      retries: 6
     networks:
       - geo-saa-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: geo-saa-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?请在 .env 设置 RABBITMQ_PASSWORD}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 30s
+    networks:
+      - geo-saa-net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   backend:
     build:
       context: ./geo-saa-backend
       dockerfile: docker/Dockerfile
     container_name: geo-saa-backend
+    restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
       MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: geo_saa
       MYSQL_USER: ${MYSQL_USER:-root}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 设置 MYSQL_PASSWORD}
       REDIS_HOST: redis
+      REDIS_PORT: 6379
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
-      # prod profile 下这两项没有默认值，缺失会导致启动失败（这是刻意的 fail-fast 设计）
-      JWT_SECRET: ${JWT_SECRET:?请先在 .env 中设置 JWT_SECRET，可用 openssl rand -base64 32 生成}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?请在 .env 设置 RABBITMQ_PASSWORD}
+      # prod profile 下缺失即 fail-fast，防止带着示例密钥上线
+      JWT_SECRET: ${JWT_SECRET:?请在 .env 设置 JWT_SECRET，可用 openssl rand -base64 32 生成}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?请在 .env 设置 CORS_ALLOWED_ORIGINS}
       AI_SIMULATION_ENABLED: ${AI_SIMULATION_ENABLED:-true}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TONGYI_API_KEY: ${TONGYI_API_KEY:-}
+      DOUBAO_API_KEY: ${DOUBAO_API_KEY:-}
+      TZ: ${TZ:-Asia/Shanghai}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     depends_on:
       mysql:
         condition: service_healthy
@@ -85,22 +141,73 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      # 业务健康检查端点（免鉴权）。start_period 给 Spring Boot 留足冷启动时间
+      # 探针用 JVM 自带的 java.net.http 而非 curl：运行阶段是 JRE 镜像，不含 curl/wget。
+      # 原版写 `curl -fsS ...`，在 JRE 镜像里永远返回非 0 → 容器永久 unhealthy
+      # → frontend 的 depends_on: service_healthy 死锁等不到后端 → 整条链路起不来。
+      test: ["CMD", "java", "-cp", "probe.jar", "HealthProbe"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     networks:
       - geo-saa-net
-    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   frontend:
     build:
       context: ./geo-saa-frontend
       dockerfile: Dockerfile
     container_name: geo-saa-frontend
+    restart: unless-stopped
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-80}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - geo-saa-net
-    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # 一次性备份容器：docker compose --profile ops run --rm backup
+  backup:
+    image: mysql:8.0
+    container_name: geo-saa-backup
+    profiles: ["ops"]
+    environment:
+      MYSQL_PWD: ${MYSQL_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        TS=$$(date +%Y%m%d-%H%M%S)
+        echo "==> 备份 geo_saa -> /backups/geo_saa-$$TS.sql.gz"
+        mysqldump -h mysql -u root --single-transaction --routines --triggers \
+          --default-character-set=utf8mb4 geo_saa | gzip > /backups/geo_saa-$$TS.sql.gz
+        echo "==> 完成: $$(ls -lh /backups/geo_saa-$$TS.sql.gz)"
+        find /backups -name 'geo_saa-*.sql.gz' -mtime +$${BACKUP_RETENTION_DAYS} -delete
+        echo "==> 已清理超过 $${BACKUP_RETENTION_DAYS} 天的旧备份"
+    networks:
+      - geo-saa-net
 
 volumes:
   mysql-data:

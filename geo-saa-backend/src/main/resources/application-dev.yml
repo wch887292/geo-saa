@@ -1,12 +1,24 @@
 spring:
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+      # Spring Boot 4.x 把 AMQP 自动配置从
+      #   org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration (Boot 3)
+      # 迁移到
+      #   org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration (Boot 4, spring-boot-amqp jar)
+      # 原写法沿用 Boot 3 的旧全限定名，在 Boot 4.1 下该类已不存在，
+      # Spring Boot 会静默忽略无效 exclude，导致 RabbitTemplate 仍被自动创建；
+      # 一旦本机没有 RabbitMQ，convertAndSend 抛 AmqpConnectException，
+      # 批量生成/分发接口直接返回 500。此处使用 Boot 4 的正确类名。
+      - org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
 
 # 开发模式禁用 RabbitMQ
 app:
   rabbitmq:
     enabled: false
+  security:
+    # 开发档案下管理员口令守卫仅告警不阻断，否则每次 pull 后本地开发都要先改密。
+    # prod 档案的默认值为 fail，不受此项影响。
+    default-password-action: ${DEFAULT_PASSWORD_ACTION:warn}
 
 jwt:
   # 仅供本地开发使用的固定密钥。生产环境由 application-prod.yml 强制要求 JWT_SECRET 环境变量。

@@ -23,7 +23,7 @@ GEO-SaaS 是面向企业的 **AI 驱动全域搜索引擎优化（GEO/AAO）平�
 - 前端：Vue 3 + Vite + Element Plus + ECharts + Pinia
 - 后端：Spring Boot 3.2 + Spring Security + MyBatis-Plus
 - 数据：MySQL 8.0 + Redis 7
-- 运行：JDK 17 + Node.js 18+，支持 Docker Compose 一键部署
+- 运行：JDK 17 + Node.js 20.19+ / 22.12+，支持 Docker Compose 一键部署
 
 ## 适用对象
 面向经销商与批发采购的制造企业（如晋江鞋服、石狮纺织、南安机械、泉州食品加工），以及需要长期、低成本获客的中小品牌。

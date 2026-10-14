@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -85,6 +86,10 @@ public class DistributeService {
         task.setCreatedBy(userId);
         distributeTaskMapper.insert(task);
 
+        // 进度追踪必须先于入队初始化：入队失败分支要调用 failProgress，
+        // 若沿用旧顺序（入队之后才 init），fail 会作用在一条尚不存在的进度记录上。
+        taskProgressService.initProgress("distribute:" + task.getId(), 3);
+
         // 推送到 RabbitMQ 队列
         Map<String, Object> message = new HashMap<>();
         message.put("taskId", task.getId());
@@ -104,14 +109,23 @@ public class DistributeService {
                 );
                 log.info("分发任务已推送到队列: taskId={}, platform={}", task.getId(), request.getTargetPlatform());
             } catch (JsonProcessingException e) {
-                log.error("序列化分发消息失败", e);
+                log.error("序列化分发消息失败: taskId={}", task.getId(), e);
+            } catch (AmqpException e) {
+                // broker 不可达时不能把异常抛给调用方（原实现会直接 500），
+                // 任务已入库，改为标记为“待处理/失败待重试”，由运维或补偿任务接管，
+                // 避免任务静默卡在初始状态。
+                log.warn("RabbitMQ 不可达，分发任务已入库但未入队: taskId={}, 原因={}",
+                        task.getId(), e.getMessage());
+                task.setStatus(Constant.TASK_STATUS_FAILED);
+                distributeTaskMapper.updateById(task);
+                taskProgressService.failProgress("distribute:" + task.getId(), "消息队列不可用，任务未分发");
             }
         } else {
-            log.warn("RabbitMQ 未启用，分发任务已跳过队列，直接处理");
+            log.warn("RabbitMQ 未启用，分发任务已入库但未入队: taskId={}", task.getId());
+            task.setStatus(Constant.TASK_STATUS_FAILED);
+            distributeTaskMapper.updateById(task);
+            taskProgressService.failProgress("distribute:" + task.getId(), "消息队列未启用，任务未分发");
         }
-
-        // 初始化进度追踪
-        taskProgressService.initProgress("distribute:" + task.getId(), 3);
 
         return task;
     }

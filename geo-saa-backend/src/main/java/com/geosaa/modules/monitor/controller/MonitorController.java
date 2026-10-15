@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.geosaa.common.PageResult;
 import com.geosaa.common.Result;
 import com.geosaa.modules.monitor.collector.GeoDataCollectorService;
+import com.geosaa.modules.monitor.collector.GeoPlatformPreset;
 import com.geosaa.modules.monitor.entity.DataMonitorStat;
 import com.geosaa.modules.monitor.service.MonitorService;
 import jakarta.validation.Valid;
@@ -100,5 +101,49 @@ public class MonitorController {
     @PreAuthorize("hasAuthority('monitor:all')")
     public Result<Map<String, Object>> collect() {
         return Result.success(geoDataCollectorService.collectAll());
+    }
+
+    /**
+     * 获取所有支持的大模型平台列表（用于前端配置选择）。
+     */
+    @GetMapping("/platforms/all")
+    public Result<List<Map<String, String>>> getAllPlatforms() {
+        List<Map<String, String>> platforms = new java.util.ArrayList<>();
+        for (GeoPlatformPreset p : GeoPlatformPreset.getAllPlatforms()) {
+            Map<String, String> info = new java.util.LinkedHashMap<>();
+            info.put("platformId", p.getPlatformId());
+            info.put("platformName", p.getPlatformName());
+            info.put("defaultApiUrl", p.getDefaultApiUrl());
+            info.put("defaultModel", p.getDefaultModel());
+            info.put("description", p.getDescription());
+            platforms.add(info);
+        }
+        return Result.success(platforms);
+    }
+
+    /**
+     * 获取当前已启用的采集平台列表。
+     */
+    @GetMapping("/platforms/enabled")
+    public Result<List<Map<String, String>>> getEnabledPlatforms() {
+        return Result.success(geoDataCollectorService.getEnabledPlatforms());
+    }
+
+    /**
+     * 手动触发竞品对标采集。
+     */
+    @PostMapping("/collect/competitors")
+    @PreAuthorize("hasAuthority('monitor:all')")
+    public Result<Map<String, Object>> collectCompetitors() {
+        return Result.success(geoDataCollectorService.collectCompetitors());
+    }
+
+    /**
+     * 获取品牌 vs 竞品对比数据。
+     */
+    @GetMapping("/competitor-comparison")
+    public Result<List<Map<String, Object>>> getCompetitorComparison(
+            @RequestParam(required = false) String brandName) {
+        return Result.success(geoDataCollectorService.getCompetitorComparison(brandName));
     }
 }

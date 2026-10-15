@@ -2,6 +2,8 @@ package com.geosaa.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geosaa.common.metrics.BusinessMetrics;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,10 +32,15 @@ public class OpenAiAdapter implements AiAdapter {
     private final RestTemplate restTemplate;
     /** 共享 Jackson 2 ObjectMapper（见 {@link com.geosaa.config.JacksonConfig}），不复用则每次 new 独立实例 */
     private final ObjectMapper objectMapper;
+    /** 业务指标：AI 调用耗时/P99（O3 可观测性） */
+    private final BusinessMetrics businessMetrics;
 
-    public OpenAiAdapter(@Qualifier("aiRestTemplate") RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public OpenAiAdapter(@Qualifier("aiRestTemplate") RestTemplate restTemplate,
+                         ObjectMapper objectMapper,
+                         BusinessMetrics businessMetrics) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        this.businessMetrics = businessMetrics;
     }
 
     @Override
@@ -140,6 +147,7 @@ public class OpenAiAdapter implements AiAdapter {
     }
 
     private String callAiApi(String prompt) {
+        Timer.Sample sample = businessMetrics.startAiInvoke("openai");
         try {
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("model", model);
@@ -155,8 +163,10 @@ public class OpenAiAdapter implements AiAdapter {
 
             org.springframework.http.HttpEntity<Map<String, Object>> entity = new org.springframework.http.HttpEntity<>(requestBody, headers);
             String response = restTemplate.postForObject(apiUrl + "/chat/completions", entity, String.class);
+            businessMetrics.stopAiInvoke(sample, "openai");
             return response;
         } catch (Exception e) {
+            businessMetrics.stopAiInvoke(sample, "openai");
             log.error("调用AI API失败", e);
             return "{\"error\":\"调用失败: " + e.getMessage() + "\"}";
         }

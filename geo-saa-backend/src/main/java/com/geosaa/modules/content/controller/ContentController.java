@@ -6,6 +6,7 @@ import com.geosaa.common.Result;
 import com.geosaa.modules.content.dto.ContentGenerateRequest;
 import com.geosaa.modules.content.entity.AiArticleContent;
 import com.geosaa.modules.content.service.ContentService;
+import com.geosaa.modules.content.service.GeoAaoContentService;
 import com.geosaa.security.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import java.util.Map;
 public class ContentController {
 
     private final ContentService contentService;
+    private final GeoAaoContentService geoAaoContentService;
 
     /**
      * 分页查询内容列表
@@ -157,6 +159,47 @@ public class ContentController {
         }
         com.geosaa.modules.content.geo.GeoValidationResult result =
                 contentService.validateGeo(request.get("content"), request.get("keywords"), publishDate);
+        return Result.success(result);
+    }
+
+    /**
+     * GEO+AAO 内容优化改写（基于提示词2）
+     * 输入页面标题、原始内容、品牌实体信息，输出优化后完整文案 + GEO/AAO改动说明
+     */
+    @PostMapping("/geo-aao/rewrite")
+    public Result<GeoAaoContentService.ContentRewriteResult> geoAaoRewrite(
+            @RequestBody Map<String, String> request) {
+        String pageTitle = request.get("pageTitle");
+        String originalContent = request.get("content");
+        String brandEntities = request.get("brandEntities");
+        GeoAaoContentService.ContentRewriteResult result =
+                geoAaoContentService.rewriteContent(pageTitle, originalContent, brandEntities);
+        return Result.success(result);
+    }
+
+    /**
+     * 生成 TL;DR 一句话摘要（页面顶部摘要，便于LLM直接摘取）
+     */
+    @PostMapping("/geo-aao/tldr")
+    public Result<String> generateTldr(@RequestBody Map<String, String> request) {
+        String content = request.get("content");
+        String brandName = request.get("brandName");
+        String tldr = geoAaoContentService.generateTldr(content, brandName);
+        return Result.success(tldr);
+    }
+
+    /**
+     * 生成 FAQ 问答模块（专门捕获AI问答问句，为AAO提供答案素材）
+     */
+    @PostMapping("/geo-aao/faq")
+    public Result<GeoAaoContentService.FaqResult> generateFaq(@RequestBody Map<String, String> request) {
+        String content = request.get("content");
+        String brandName = request.get("brandName");
+        int faqCount = 5;
+        if (request.get("faqCount") != null) {
+            try { faqCount = Integer.parseInt(request.get("faqCount")); } catch (Exception ignored) {}
+        }
+        GeoAaoContentService.FaqResult result = geoAaoContentService.generateFaq(content, brandName, faqCount);
         return Result.success(result);
     }
 }

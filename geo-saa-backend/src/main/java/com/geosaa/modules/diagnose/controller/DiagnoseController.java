@@ -6,7 +6,9 @@ import com.geosaa.common.Result;
 import com.geosaa.modules.common.TaskProgress;
 import com.geosaa.modules.diagnose.dto.DiagnoseRequest;
 import com.geosaa.modules.diagnose.entity.AiDiagnoseTask;
+import com.geosaa.modules.diagnose.dto.GeoAaoDiagnosisReport;
 import com.geosaa.modules.diagnose.service.DiagnoseService;
+import com.geosaa.modules.diagnose.service.GeoAaoDiagnosisService;
 import com.geosaa.security.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ import java.util.Map;
 public class DiagnoseController {
 
     private final DiagnoseService diagnoseService;
+    private final GeoAaoDiagnosisService geoAaoDiagnosisService;
 
     /**
      * 分页查询诊断任务列表
@@ -85,6 +88,20 @@ public class DiagnoseController {
     @GetMapping("/{id}/report")
     public Result<Map<String, Object>> getReport(@PathVariable Long id) {
         Map<String, Object> report = diagnoseService.getDiagnosisReport(id);
+        return Result.success(report);
+    }
+
+    /**
+     * GEO+AAO 综合诊断评分（基于五阶段方法论）
+     * 输入站点信息和审计数据，输出标准化评分报告（SEO30+GEO30+AAO40=100分）
+     */
+    @PostMapping("/geo-aao/diagnose")
+    public Result<GeoAaoDiagnosisReport> geoAaoDiagnose(@RequestBody Map<String, Object> request) {
+        String siteUrl = (String) request.get("siteUrl");
+        String brandName = (String) request.get("brandName");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> auditData = (Map<String, Object>) request.get("auditData");
+        GeoAaoDiagnosisReport report = geoAaoDiagnosisService.diagnose(siteUrl, brandName, auditData);
         return Result.success(report);
     }
 }

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import router from '@/router'
+import { LANG_KEY, LANG_ZH } from '@/i18n'
 
 const TOKEN_KEY = 'geo-saa-token'
 const REFRESH_TOKEN_KEY = 'geo-saa-refresh-token'
@@ -33,6 +34,9 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // i18n：将当前语言通过 Accept-Language 头发送给后端，使后端错误消息与前端语言一致
+    const lang = localStorage.getItem(LANG_KEY) || LANG_ZH
+    config.headers['Accept-Language'] = lang === LANG_ZH ? 'zh-CN,zh;q=0.9' : 'en;q=0.9'
     return config
   },
   (error) => Promise.reject(error)

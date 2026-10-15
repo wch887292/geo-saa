@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { createPinia } from 'pinia'
+import i18n from './i18n'
 import { ElLoading } from 'element-plus/es/components/loading/index.mjs'
 import {
   Odometer,
@@ -19,7 +20,9 @@ import {
   Document,
   Promotion,
   Medal,
-  UserFilled
+  UserFilled,
+  Operation,
+  List
 } from '@element-plus/icons-vue'
 
 // Element Plus 按需引入：模板中的 <el-*> 组件由 vite 插件自动按需加载并注入样式，
@@ -36,6 +39,7 @@ import 'element-plus/es/components/loading/style/css'
 const app = createApp(App)
 app.use(router)
 app.use(createPinia())
+app.use(i18n)
 
 // 仅注册实际用到的图标（避免 import * 全量打入 2000+ 图标），显式注册即可按需打包。
 const icons = {
@@ -54,7 +58,9 @@ const icons = {
   Document,
   Promotion,
   Medal,
-  UserFilled
+  UserFilled,
+  Operation,
+  List
 }
 for (const [name, component] of Object.entries(icons)) {
   app.component(name, component)

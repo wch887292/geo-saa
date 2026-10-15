@@ -1,11 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import i18n from '@/i18n'
 
 const routes = [
   {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/login.vue'),
-    meta: { title: '登录', public: true }
+    meta: { title: 'auth.login', public: true }
   },
   {
     path: '/',
@@ -17,61 +18,67 @@ const routes = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '工作台首页', icon: 'Odometer' }
+        meta: { title: 'menu.dashboard', icon: 'Odometer' }
       },
       {
         path: 'diagnose',
         name: 'Diagnose',
         component: () => import('@/views/diagnose/index.vue'),
-        meta: { title: '诊断中心', icon: 'Search' }
+        meta: { title: 'menu.diagnose', icon: 'Search' }
       },
       {
         path: 'knowledge',
         name: 'Knowledge',
         component: () => import('@/views/knowledge/index.vue'),
-        meta: { title: '知识库', icon: 'Notebook' }
+        meta: { title: 'menu.knowledge', icon: 'Notebook' }
       },
       {
         path: 'content',
         name: 'Content',
         component: () => import('@/views/content/index.vue'),
-        meta: { title: '创作中心', icon: 'Edit' }
+        meta: { title: 'menu.content', icon: 'Edit' }
       },
       {
         path: 'asset',
         name: 'Asset',
         component: () => import('@/views/asset/index.vue'),
-        meta: { title: '资产存证', icon: 'FolderChecked' }
+        meta: { title: 'menu.asset', icon: 'FolderChecked' }
       },
       {
         path: 'distribute',
         name: 'Distribute',
         component: () => import('@/views/distribute/index.vue'),
-        meta: { title: '分发中心', icon: 'Share' }
+        meta: { title: 'menu.distribute', icon: 'Share' }
       },
       {
         path: 'monitor',
         name: 'Monitor',
         component: () => import('@/views/monitor/index.vue'),
-        meta: { title: '数据看板', icon: 'DataAnalysis' }
+        meta: { title: 'menu.monitor', icon: 'DataAnalysis' }
       },
       {
         path: 'geo',
         name: 'Geo',
         component: () => import('@/views/geo/index.vue'),
-        meta: { title: 'GEO/AAO 体检', icon: 'MagicStick' }
+        meta: { title: 'menu.geo', icon: 'MagicStick' }
       },
       {
         path: 'system/permission',
         name: 'SystemPermission',
         component: () => import('@/views/system/permission.vue'),
-        meta: { title: '权限管理', icon: 'Setting' }
+        meta: { title: 'menu.permission', icon: 'Setting' }
       },
       {
         path: 'system/model-config',
         name: 'SystemModelConfig',
         component: () => import('@/views/system/model-config.vue'),
-        meta: { title: '模型配置', icon: 'Cpu' }
+        meta: { title: 'menu.modelConfig', icon: 'Cpu' }
+      },
+      {
+        path: 'system/ai-call-log',
+        name: 'SystemAiCallLog',
+        component: () => import('@/views/system/ai-call-log.vue'),
+        meta: { title: 'menu.aiCallLog', icon: 'List' }
       }
     ]
   },
@@ -88,10 +95,12 @@ const router = createRouter({
   routes
 })
 
-const BASE_TITLE = 'GEO-SaaS 全域AI搜索优化平台'
+const BASE_TITLE = 'GEO-SaaS'
 
 router.beforeEach((to, from, next) => {
-  document.title = to.meta?.title ? `${to.meta.title} - ${BASE_TITLE}` : BASE_TITLE
+  // i18n：文档标题根据当前语言动态翻译
+  const pageTitle = to.meta?.title ? i18n.global.t(to.meta.title) : ''
+  document.title = pageTitle ? `${pageTitle} - ${BASE_TITLE}` : BASE_TITLE
 
   const token = localStorage.getItem('geo-saa-token')
   if (to.meta.requiresAuth && !token) {

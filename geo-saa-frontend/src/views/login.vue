@@ -1,10 +1,17 @@
 <template>
   <div class="login-container">
+    <!-- 登录页语言切换（右上角，未登录也可切换） -->
+    <div class="login-lang-switch">
+      <el-radio-group v-model="localLang" size="small" @change="handleLangChange">
+        <el-radio-button value="zh-CN">中文</el-radio-button>
+        <el-radio-button value="en">EN</el-radio-button>
+      </el-radio-group>
+    </div>
     <div class="login-card">
       <div class="login-header">
         <img src="@/assets/logo.svg" alt="logo" class="login-logo" />
-        <h2 class="login-title">GEO-SaaS 全域AI搜索优化平台</h2>
-        <p class="login-desc">请登录您的账户</p>
+        <h2 class="login-title">GEO-SaaS {{ $t('auth.platformDesc') }}</h2>
+        <p class="login-desc">{{ $t('auth.welcomeBack') }}</p>
       </div>
       <el-form
         ref="formRef"
@@ -16,7 +23,7 @@
         <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"
-            placeholder="用户名"
+            :placeholder="$t('auth.username')"
             :prefix-icon="User"
             size="large"
           />
@@ -25,7 +32,7 @@
           <el-input
             v-model="loginForm.password"
             type="password"
-            placeholder="密码"
+            :placeholder="$t('auth.password')"
             :prefix-icon="Lock"
             size="large"
             show-password
@@ -39,7 +46,7 @@
             :loading="loading"
             @click="handleLogin"
           >
-            {{ loading ? '登录中...' : '登 录' }}
+            {{ loading ? $t('common.loading') : $t('auth.login') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -48,18 +55,25 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { setLanguage } from '@/i18n'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
 const route = useRoute()
+const { locale, t } = useI18n()
 const userStore = useUserStore()
 
 const formRef = ref(null)
 const loading = ref(false)
+const localLang = computed({
+  get: () => locale.value,
+  set: (v) => { locale.value = v }
+})
 
 const loginForm = reactive({
   username: '',
@@ -68,11 +82,15 @@ const loginForm = reactive({
 
 const rules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
+    { required: true, message: t('auth.usernameRequired'), trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' }
+    { required: true, message: t('auth.passwordRequired'), trigger: 'blur' }
   ]
+}
+
+function handleLangChange(lang) {
+  setLanguage(lang)
 }
 
 async function handleLogin() {
@@ -89,7 +107,7 @@ async function handleLogin() {
       username: loginForm.username,
       password: loginForm.password
     })
-    ElMessage.success('登录成功')
+    ElMessage.success(t('auth.loginSuccess'))
     const redirect = route.query.redirect || '/dashboard'
     router.push(redirect)
   } catch {
@@ -107,6 +125,14 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+}
+
+.login-lang-switch {
+  position: absolute;
+  top: 24px;
+  right: 32px;
+  z-index: 10;
 }
 
 .login-card {

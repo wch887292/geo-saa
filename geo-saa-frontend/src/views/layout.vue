@@ -16,48 +16,52 @@
       >
         <el-menu-item index="/dashboard">
           <el-icon><Odometer /></el-icon>
-          <template #title>Dashboard</template>
+          <template #title>{{ $t('menu.dashboard') }}</template>
         </el-menu-item>
         <el-menu-item index="/diagnose">
           <el-icon><Search /></el-icon>
-          <template #title>诊断中心</template>
+          <template #title>{{ $t('menu.diagnose') }}</template>
         </el-menu-item>
         <el-menu-item index="/knowledge">
           <el-icon><Notebook /></el-icon>
-          <template #title>知识库</template>
+          <template #title>{{ $t('menu.knowledge') }}</template>
         </el-menu-item>
         <el-menu-item index="/content">
           <el-icon><Edit /></el-icon>
-          <template #title>创作中心</template>
+          <template #title>{{ $t('menu.content') }}</template>
         </el-menu-item>
         <el-menu-item index="/asset">
           <el-icon><FolderChecked /></el-icon>
-          <template #title>资产存证</template>
+          <template #title>{{ $t('menu.asset') }}</template>
         </el-menu-item>
         <el-menu-item index="/distribute">
           <el-icon><Share /></el-icon>
-          <template #title>分发中心</template>
+          <template #title>{{ $t('menu.distribute') }}</template>
         </el-menu-item>
         <el-menu-item index="/monitor">
           <el-icon><DataAnalysis /></el-icon>
-          <template #title>数据看板</template>
+          <template #title>{{ $t('menu.monitor') }}</template>
         </el-menu-item>
         <el-menu-item index="/geo">
           <el-icon><MagicStick /></el-icon>
-          <template #title>GEO/AAO 体检</template>
+          <template #title>{{ $t('menu.geo') }}</template>
         </el-menu-item>
         <el-sub-menu index="system">
           <template #title>
             <el-icon><Setting /></el-icon>
-            <span>系统设置</span>
+            <span>{{ $t('menu.system') }}</span>
           </template>
           <el-menu-item index="/system/permission">
             <el-icon><Lock /></el-icon>
-            <template #title>权限管理</template>
+            <template #title>{{ $t('menu.permission') }}</template>
           </el-menu-item>
           <el-menu-item index="/system/model-config">
             <el-icon><Cpu /></el-icon>
-            <template #title>模型配置</template>
+            <template #title>{{ $t('menu.modelConfig') }}</template>
+          </el-menu-item>
+          <el-menu-item index="/system/ai-call-log">
+            <el-icon><List /></el-icon>
+            <template #title>{{ $t('menu.aiCallLog') }}</template>
           </el-menu-item>
         </el-sub-menu>
       </el-menu>
@@ -70,11 +74,25 @@
             <Expand v-else />
           </el-icon>
           <el-breadcrumb separator="/">
-            <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: '/dashboard' }">{{ $t('common.home') }}</el-breadcrumb-item>
             <el-breadcrumb-item v-if="currentTitle">{{ currentTitle }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
         <div class="header-right">
+          <!-- 语言切换器（#2 i18n） -->
+          <el-dropdown trigger="click" @command="handleLanguageChange" class="lang-dropdown">
+            <span class="lang-trigger">
+              <el-icon><Operation /></el-icon>
+              <span class="lang-text">{{ currentLangText }}</span>
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="zh-CN" :disabled="currentLang === 'zh-CN'">中文</el-dropdown-item>
+                <el-dropdown-item command="en" :disabled="currentLang === 'en'">English</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-dropdown trigger="click" @command="handleCommand">
             <span class="user-dropdown">
               <el-avatar :size="32"><UserFilled /></el-avatar>
@@ -83,8 +101,8 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+                <el-dropdown-item command="profile">{{ $t('common.profile') }}</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>{{ $t('common.logout') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -104,16 +122,24 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { setLanguage, LANG_ZH, LANG_EN } from '@/i18n'
 import { useAppStore } from '@/store/app'
 import { useUserStore } from '@/store/user'
 
 const route = useRoute()
 const router = useRouter()
+const { locale, t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
-const currentTitle = computed(() => route.meta?.title)
+const currentTitle = computed(() => {
+  const key = route.meta?.title
+  return key ? t(key) : ''
+})
+const currentLang = computed(() => locale.value)
+const currentLangText = computed(() => locale.value === LANG_ZH ? '中文' : 'EN')
 
 const activeMenu = computed(() => {
   const { path } = route
@@ -123,6 +149,10 @@ const activeMenu = computed(() => {
 
 function toggleSidebar() {
   appStore.toggleSidebar()
+}
+
+function handleLanguageChange(lang) {
+  setLanguage(lang)
 }
 
 async function handleCommand(command) {
@@ -205,6 +235,20 @@ onMounted(() => {
 .header-right {
   display: flex;
   align-items: center;
+  gap: 20px;
+}
+.lang-dropdown {
+  cursor: pointer;
+}
+.lang-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #606266;
+  font-size: 14px;
+}
+.lang-text {
+  min-width: 28px;
 }
 .user-dropdown {
   display: flex;

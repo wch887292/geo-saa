@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO-SaaS 项目全面分析报告 v2.0</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f2f5; color: #333; line-height: 1.6; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 40px; border-radius: 12px; margin-bottom: 24px; }
+.header h1 { font-size: 32px; margin-bottom: 8px; }
+.header .subtitle { font-size: 16px; opacity: 0.9; }
+.header .meta { margin-top: 16px; display: flex; gap: 24px; flex-wrap: wrap; }
+.header .meta-item { background: rgba(255,255,255,0.15); padding: 8px 16px; border-radius: 6px; font-size: 14px; }
+.card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.card h2 { font-size: 22px; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #667eea; display: flex; align-items: center; gap: 8px; }
+.card h2 .icon { width: 28px; height: 28px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; }
+.card h3 { font-size: 18px; color: #333; margin: 20px 0 12px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.stat-box { background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%); padding: 20px; border-radius: 10px; text-align: center; border-left: 4px solid #667eea; }
+.stat-box .num { font-size: 32px; font-weight: 700; color: #667eea; }
+.stat-box .label { font-size: 13px; color: #666; margin-top: 4px; }
+.stat-box.green { border-left-color: #67c23a; } .stat-box.green .num { color: #67c23a; }
+.stat-box.orange { border-left-color: #e6a23c; } .stat-box.orange .num { color: #e6a23c; }
+.stat-box.red { border-left-color: #f56c6c; } .stat-box.red .num { color: #f56c6c; }
+.stat-box.cyan { border-left-color: #00bcd4; } .stat-box.cyan .num { color: #00bcd4; }
+.chart-container { width: 100%; height: 400px; margin: 16px 0; }
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+th { background: #667eea; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; }
+td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+tr:hover { background: #f5f7fa; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+.tag-blue { background: #ecf5ff; color: #409eff; }
+.tag-green { background: #f0f9eb; color: #67c23a; }
+.tag-orange { background: #fdf6ec; color: #e6a23c; }
+.tag-red { background: #fef0f0; color: #f56c6c; }
+.tag-purple { background: #f3e8ff; color: #9c27b0; }
+.tag-cyan { background: #e0f7fa; color: #00bcd4; }
+.arch-svg { width: 100%; overflow-x: auto; }
+.advantage-list, .issue-list { list-style: none; }
+.advantage-list li, .issue-list li { padding: 10px 0 10px 28px; position: relative; border-bottom: 1px solid #f0f0f0; }
+.advantage-list li::before { content: '✓'; position: absolute; left: 0; color: #67c23a; font-weight: 700; font-size: 16px; }
+.issue-list li::before { content: '!'; position: absolute; left: 0; color: #f56c6c; font-weight: 700; font-size: 16px; background: #fef0f0; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; }
+.priority-p0 { color: #f56c6c; font-weight: 700; }
+.priority-p1 { color: #e6a23c; font-weight: 700; }
+.priority-p2 { color: #409eff; font-weight: 700; }
+.priority-p3 { color: #909399; font-weight: 700; }
+.footer { text-align: center; padding: 24px; color: #999; font-size: 13px; }
+.ai-arch { background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); padding: 20px; border-radius: 10px; margin: 16px 0; }
+.ai-flow { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.ai-node { background: #fff; border: 2px solid #667eea; border-radius: 8px; padding: 10px 16px; text-align: center; font-size: 13px; min-width: 100px; }
+.ai-node.core { background: #667eea; color: #fff; }
+.ai-arrow { color: #667eea; font-size: 20px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>GEO-SaaS 项目全面分析报告</h1>
+  <div class="subtitle">GEO 内容智能生成与分发 SaaS 平台 · v2.0 深度分析</div>
+  <div class="meta">
+    <div class="meta-item">📅 分析日期：2026-09-09</div>
+    <div class="meta-item">📦 版本：v2.0.0</div>
+    <div class="meta-item">🔧 后端：Spring Boot 4.1.0 + Java 17</div>
+    <div class="meta-item">🎨 前端：Vue 3.5 + Vite 8 + Element Plus 2.14</div>
+  </div>
+</div>
+
+<!-- 一、项目概览 -->
+<div class="card">
+  <h2><span class="icon">1</span>项目概览</h2>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="num">147</div><div class="label">后端 Java 文件</div></div>
+    <div class="stat-box green"><div class="num">9,314</div><div class="label">后端代码行数</div></div>
+    <div class="stat-box orange"><div class="num">17</div><div class="label">前端 Vue 页面</div></div>
+    <div class="stat-box cyan"><div class="num">5,451</div><div class="label">前端代码行数</div></div>
+    <div class="stat-box red"><div class="num">20</div><div class="label">数据库表</div></div>
+    <div class="stat-box"><div class="num">122</div><div class="label">REST API 端点</div></div>
+    <div class="stat-box green"><div class="num">16</div><div class="label">测试类</div></div>
+    <div class="stat-box orange"><div class="num">2,584</div><div class="label">测试代码行数</div></div>
+  </div>
+  <p>GEO-SaaS 是一个面向品牌方的 GEO（Generative Engine Optimization，生成式引擎优化）SaaS 平台，核心能力包括：AI 内容创作、品牌知识管理、AI 诊断分析、多渠道分发、数据监控、RAG 检索增强、开放 API/Webhook、多租户 SaaS 化、AI 大模型底层架构等。项目采用前后端分离架构，已完成 7 项企业级能力建设和 AI 大模型底层架构搭建。</p>
+</div>
+
+<!-- 二、系统架构图 -->
+<div class="card">
+  <h2><span class="icon">2</span>系统架构图</h2>
+  <div class="arch-svg">
+    <svg width="1100" height="620" viewBox="0 0 1100 620" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#667eea;stop-opacity:1" /><stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" /></linearGradient>
+        <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f093fb;stop-opacity:1" /><stop offset="100%" style="stop-color:#f5576c;stop-opacity:1" /></linearGradient>
+        <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" /><stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" /></linearGradient>
+        <linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#43e97b;stop-opacity:1" /><stop offset="100%" style="stop-color:#38f9d7;stop-opacity:1" /></linearGradient>
+        <linearGradient id="g5" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#fa709a;stop-opacity:1" /><stop offset="100%" style="stop-color:#fee140;stop-opacity:1" /></linearGradient>
+        <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#999" /></marker>
+      </defs>
+
+      <!-- 客户端层 -->
+      <rect x="350" y="10" width="400" height="50" rx="8" fill="url(#g1)" />
+      <text x="550" y="40" text-anchor="middle" fill="#fff" font-size="16" font-weight="bold">客户端层</text>
+      <rect x="370" y="70" width="170" height="36" rx="6" fill="#667eea" opacity="0.8" />
+      <text x="455" y="93" text-anchor="middle" fill="#fff" font-size="13">Web 前端 (Vue 3)</text>
+      <rect x="560" y="70" width="170" height="36" rx="6" fill="#667eea" opacity="0.8" />
+      <text x="645" y="93" text-anchor="middle" fill="#fff" font-size="13">开放 API 调用方</text>
+
+      <!-- 箭头 -->
+      <line x1="550" y1="106" x2="550" y2="130" stroke="#999" stroke-width="2" marker-end="url(#arrow)" />
+
+      <!-- 安全网关层 -->
+      <rect x="300" y="135" width="500" height="50" rx="8" fill="url(#g2)" />
+      <text x="550" y="165" text-anchor="middle" fill="#fff" font-size="15" font-weight="bold">安全网关层 · JWT 认证 · API Key 鉴权 · 多租户解析 · CORS · TraceId</text>
+
+      <line x1="550" y1="185" x2="550" y2="210" stroke="#999" stroke-width="2" marker-end="url(#arrow)" />
+
+      <!-- 业务模块层 -->
+      <rect x="30" y="215" width="1040" height="200" rx="10" fill="#f8f9fa" stroke="#ddd" stroke-width="1" />
+      <text x="50" y="240" fill="#333" font-size="14" font-weight="bold">业务服务层（15 个模块 · 19 个 Controller · 122 个 API）</text>
+
+      <!-- 第一行模块 -->
+      <rect x="50" y="255" width="120" height="55" rx="6" fill="url(#g3)" />
+      <text x="110" y="280" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">内容创作</text>
+      <text x="110" y="298" text-anchor="middle" fill="#fff" font-size="10">content · 12 API</text>
+
+      <rect x="185" y="255" width="120" height="55" rx="6" fill="url(#g3)" />
+      <text x="245" y="280" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">知识管理</text>
+      <text x="245" y="298" text-anchor="middle" fill="#fff" font-size="10">knowledge · 12 API</text>
+
+      <rect x="320" y="255" width="120" height="55" rx="6" fill="url(#g3)" />
+      <text x="380" y="280" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">AI 诊断</text>
+      <text x="380" y="298" text-anchor="middle" fill="#fff" font-size="10">diagnose · 6 API</text>
+
+      <rect x="455" y="255" width="120" height="55" rx="6" fill="url(#g3)" />
+      <text x="515" y="280" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">多渠道分发</text>
+      <text x="515" y="298" text-anchor="middle" fill="#fff" font-size="10">distribute · 9 API</text>
+
+      <rect x="590" y="255" width="120" height="55" rx="6" fill="url(#g3)" />
+      <text x="650" y="280" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">数据监控</text>
+      <text x="650" y="298" text-anchor="middle" fill="#fff" font-size="10">monitor · 7 API</text>
+
+      <rect x="725" y="255" width="120" height="55" rx="6" fill="url(#g3)" />
+      <text x="785" y="280" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">GEO 体检</text>
+      <text x="785" y="298" text-anchor="middle" fill="#fff" font-size="10">geo · 3 API</text>
+
+      <rect x="860" y="255" width="120" height="55" rx="6" fill="url(#g3)" />
+      <text x="920" y="280" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">资产存证</text>
+      <text x="920" y="298" text-anchor="middle" fill="#fff" font-size="10">asset · 2 API</text>
+
+      <!-- 第二行模块 -->
+      <rect x="50" y="325" width="150" height="55" rx="6" fill="url(#g4)" />
+      <text x="125" y="350" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">🤖 AI 大模型架构</text>
+      <text x="125" y="368" text-anchor="middle" fill="#fff" font-size="10">ai · 19 API · 新增</text>
+
+      <rect x="215" y="325" width="120" height="55" rx="6" fill="url(#g4)" />
+      <text x="275" y="350" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">RAG 检索</text>
+      <text x="275" y="368" text-anchor="middle" fill="#fff" font-size="10">rag · 6 API</text>
+
+      <rect x="350" y="325" width="150" height="55" rx="6" fill="url(#g4)" />
+      <text x="425" y="350" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">开放 API/Webhook</text>
+      <text x="425" y="368" text-anchor="middle" fill="#fff" font-size="10">openapi · 22 API</text>
+
+      <rect x="515" y="325" width="120" height="55" rx="6" fill="url(#g4)" />
+      <text x="575" y="350" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">认证授权</text>
+      <text x="575" y="368" text-anchor="middle" fill="#fff" font-size="10">auth · 6 API</text>
+
+      <rect x="650" y="325" width="120" height="55" rx="6" fill="url(#g4)" />
+      <text x="710" y="350" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">系统管理</text>
+      <text x="710" y="368" text-anchor="middle" fill="#fff" font-size="10">system · 17 API</text>
+
+      <rect x="785" y="325" width="120" height="55" rx="6" fill="url(#g4)" />
+      <text x="845" y="350" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">统计分析</text>
+      <text x="845" y="368" text-anchor="middle" fill="#fff" font-size="10">statistics · 1 API</text>
+
+      <line x1="550" y1="415" x2="550" y2="440" stroke="#999" stroke-width="2" marker-end="url(#arrow)" />
+
+      <!-- 数据存储层 -->
+      <rect x="30" y="445" width="1040" height="80" rx="10" fill="#f8f9fa" stroke="#ddd" stroke-width="1" />
+      <text x="50" y="470" fill="#333" font-size="14" font-weight="bold">数据存储层（20 张表）</text>
+      <rect x="50" y="480" width="200" height="36" rx="6" fill="url(#g5)" />
+      <text x="150" y="503" text-anchor="middle" fill="#fff" font-size="12">MySQL 8.0 · 20 张业务表</text>
+      <rect x="270" y="480" width="200" height="36" rx="6" fill="url(#g5)" />
+      <text x="370" y="503" text-anchor="middle" fill="#fff" font-size="12">Redis 7 · 缓存/会话</text>
+      <rect x="490" y="480" width="200" height="36" rx="6" fill="url(#g5)" />
+      <text x="590" y="503" text-anchor="middle" fill="#fff" font-size="12">RabbitMQ · 异步消息</text>
+      <rect x="710" y="480" width="200" height="36" rx="6" fill="url(#g5)" />
+      <text x="810" y="503" text-anchor="middle" fill="#fff" font-size="12">向量存储 · RAG 检索</text>
+
+      <line x1="550" y1="525" x2="550" y2="550" stroke="#999" stroke-width="2" marker-end="url(#arrow)" />
+
+      <!-- 基础设施层 -->
+      <rect x="30" y="555" width="1040" height="55" rx="10" fill="#f8f9fa" stroke="#ddd" stroke-width="1" />
+      <text x="50" y="580" fill="#333" font-size="14" font-weight="bold">基础设施层</text>
+      <text x="50" y="600" fill="#666" font-size="12">Docker 多架构构建 · Docker Compose 编排 · 信创适配(达梦/金仓) · 私有化部署 · Prometheus 指标 · 结构化日志 · i18n 中英双语 · Flyway 风格迁移脚本</text>
+    </svg>
+  </div>
+</div>
+
+<!-- 三、后端模块分析 -->
+<div class="card">
+  <h2><span class="icon">3</span>后端模块深度分析</h2>
+  <div class="chart-row">
+    <div id="chart-module-files" class="chart-container"></div>
+    <div id="chart-module-lines" class="chart-container"></div>
+  </div>
+  <h3>各模块详情</h3>
+  <table>
+    <tr><th>模块</th><th>文件数</th><th>Controller</th><th>API 端点</th><th>核心职责</th></tr>
+    <tr><td><span class="tag tag-purple">ai</span></td><td>16</td><td>4</td><td>19</td><td>AI 大模型底层架构：模型管理、统一对话、调用日志、Prompt模板</td></tr>
+    <tr><td><span class="tag tag-blue">openapi</span></td><td>15</td><td>3</td><td>22</td><td>开放 API、API Key 管理、Webhook 订阅与投递</td></tr>
+    <tr><td><span class="tag tag-cyan">monitor</span></td><td>10</td><td>1</td><td>7</td><td>数据采集、搜索引擎监控、AI 分析、统计聚合</td></tr>
+    <tr><td><span class="tag tag-green">rag</span></td><td>10</td><td>1</td><td>6</td><td>文本分块、Embedding、向量存储、检索增强生成</td></tr>
+    <tr><td><span class="tag tag-orange">system</span></td><td>10</td><td>2</td><td>17</td><td>系统配置、租户管理、权限管理</td></tr>
+    <tr><td><span class="tag tag-blue">content</span></td><td>9</td><td>1</td><td>12</td><td>AI 内容创作、批量生成、合规检测、模板管理</td></tr>
+    <tr><td><span class="tag tag-green">auth</span></td><td>8</td><td>1</td><td>6</td><td>用户认证、JWT 签发、登录注册、密码重置</td></tr>
+    <tr><td><span class="tag tag-cyan">knowledge</span></td><td>8</td><td>1</td><td>12</td><td>品牌知识库、版本管理、知识问答</td></tr>
+    <tr><td><span class="tag tag-orange">distribute</span></td><td>6</td><td>1</td><td>9</td><td>多渠道分发任务、分发状态追踪</td></tr>
+    <tr><td><span class="tag tag-red">diagnose</span></td><td>5</td><td>1</td><td>6</td><td>AI 诊断分析、GEO 体检报告</td></tr>
+    <tr><td><span class="tag tag-blue">asset</span></td><td>4</td><td>1</td><td>2</td><td>数字资产存证</td></tr>
+    <tr><td><span class="tag tag-green">geo</span></td><td>4</td><td>1</td><td>3</td><td>GEO/AAO 优化引擎</td></tr>
+    <tr><td><span class="tag tag-orange">statistics</span></td><td>2</td><td>1</td><td>1</td><td>全局统计分析</td></tr>
+  </table>
+</div>
+
+<!-- 四、AI 大模型底层架构专题 -->
+<div class="card">
+  <h2><span class="icon">4</span>AI 大模型底层架构专题（新增）</h2>
+  <p>本次新增的 AI 大模型底层架构是平台的核心基础设施，使<strong>所有业务服务都基于可配置的 AI 大模型来服务</strong>，用户可自主管理自己的 AI 模型配置。</p>
+
+  <div class="ai-arch">
+    <h3 style="margin-top:0">架构调用链</h3>
+    <div class="ai-flow">
+      <div class="ai-node">业务模块<br><small>内容/诊断/RAG</small></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node core">AiChatService<br><small>统一对话入口</small></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node">模型选择<br><small>指定/默认</small></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node">降级+重试<br><small>故障转移</small></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node">OpenAI 兼容 API<br><small>/chat/completions</small></div>
+    </div>
+    <div class="ai-flow">
+      <div class="ai-node">调用日志<br><small>ai_call_log</small></div>
+      <div class="ai-arrow">←</div>
+      <div class="ai-node">费用估算<br><small>按模型单价</small></div>
+      <div class="ai-arrow">←</div>
+      <div class="ai-node">Token 统计<br><small>prompt/completion</small></div>
+      <div class="ai-arrow">←</div>
+      <div class="ai-node">响应解析<br><small>content/usage</small></div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-box purple" style="border-left-color:#9c27b0"><div class="num" style="color:#9c27b0">3</div><div class="label">新增数据库表</div></div>
+    <div class="stat-box" style="border-left-color:#9c27b0"><div class="num" style="color:#9c27b0">16</div><div class="label">新增 Java 文件</div></div>
+    <div class="stat-box green"><div class="num" style="color:#67c23a">19</div><div class="label">新增 API 端点</div></div>
+    <div class="stat-box orange"><div class="num" style="color:#e6a23c">7</div><div class="label">支持模型提供商</div></div>
+  </div>
+
+  <h3>核心能力</h3>
+  <table>
+    <tr><th>能力</th><th>说明</th></tr>
+    <tr><td><span class="tag tag-purple">自定义模型设置</span></td><td>用户自主配置 API Key、URL、模型ID、温度、最大Token、超时、优先级</td></tr>
+    <tr><td><span class="tag tag-purple">多提供商支持</span></td><td>OpenAI / DeepSeek / 通义千问 / 豆包 / Claude / Ollama / 自定义(OpenAI兼容)</td></tr>
+    <tr><td><span class="tag tag-purple">统一调用入口</span></td><td>所有业务模块通过 AiChatService.chat() 调用，支持多轮对话、参数覆盖</td></tr>
+    <tr><td><span class="tag tag-green">故障自动降级</span></td><td>主模型失败时按 priority 自动切换备用模型</td></tr>
+    <tr><td><span class="tag tag-green">指数退避重试</span></td><td>最多 2 次重试，间隔 1s→2s</td></tr>
+    <tr><td><span class="tag tag-orange">完整调用日志</span></td><td>记录 prompt、响应、token、费用、耗时、状态，支持多维度筛选统计</td></tr>
+    <tr><td><span class="tag tag-orange">费用估算</span></td><td>按模型单价自动计算调用费用（美元）</td></tr>
+    <tr><td><span class="tag tag-cyan">模拟模式</span></td><td>无 API Key 时返回模拟响应，便于开发测试演示</td></tr>
+    <tr><td><span class="tag tag-cyan">Prompt 模板</span></td><td>预置 5 个模板，支持 {{变量}} 占位符渲染，版本管理</td></tr>
+    <tr><td><span class="tag tag-blue">多租户隔离</span></td><td>模型配置和调用日志按 tenant_id 隔离</td></tr>
+  </table>
+
+  <h3>新增数据库表</h3>
+  <table>
+    <tr><th>表名</th><th>用途</th><th>核心字段</th></tr>
+    <tr><td><code>ai_model_config</code></td><td>AI 模型配置（自定义大模型设置）</td><td>model_name, provider, api_key, api_url, model_id, temperature, max_tokens, is_default, priority</td></tr>
+    <tr><td><code>ai_call_log</code></td><td>AI 调用日志</td><td>model_config_id, prompt_text, response_text, prompt_tokens, completion_tokens, cost_amount, latency_ms, status</td></tr>
+    <tr><td><code>ai_prompt_template</code></td><td>Prompt 模板</td><td>template_code, system_prompt, user_prompt_template, version, is_active</td></tr>
+  </table>
+</div>
+
+<!-- 五、前端分析 -->
+<div class="card">
+  <h2><span class="icon">5</span>前端分析</h2>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="num">17</div><div class="label">Vue 组件/页面</div></div>
+    <div class="stat-box green"><div class="num">14</div><div class="label">业务页面</div></div>
+    <div class="stat-box orange"><div class="num">12</div><div class="label">API 封装模块</div></div>
+    <div class="stat-box cyan"><div class="num">5,451</div><div class="label">前端代码行数</div></div>
+  </div>
+  <h3>页面清单</h3>
+  <table>
+    <tr><th>页面</th><th>路由</th><th>代码行数</th><th>说明</th></tr>
+    <tr><td>工作台</td><td>/dashboard</td><td>267</td><td>数据概览、快捷操作</td></tr>
+    <tr><td>AI 诊断</td><td>/diagnose</td><td>361</td><td>品牌 GEO 诊断分析</td></tr>
+    <tr><td>知识库</td><td>/knowledge</td><td>468</td><td>品牌知识管理、问答</td></tr>
+    <tr><td>创作中心</td><td>/content</td><td>351</td><td>AI 内容创作、批量生成</td></tr>
+    <tr><td>资产存证</td><td>/asset</td><td>277</td><td>数字资产存证管理</td></tr>
+    <tr><td>分发中心</td><td>/distribute</td><td>287</td><td>多渠道分发任务</td></tr>
+    <tr><td>数据看板</td><td>/monitor</td><td>256</td><td>监控数据可视化</td></tr>
+    <tr><td>GEO 体检</td><td>/geo</td><td>394</td><td>GEO/AAO 优化体检</td></tr>
+    <tr><td><span class="tag tag-purple">大模型设置</span></td><td>/system/model-config</td><td>266</td><td><strong>新增</strong>：自定义大模型配置管理</td></tr>
+    <tr><td><span class="tag tag-purple">AI 调用日志</span></td><td>/system/ai-call-log</td><td>233</td><td><strong>新增</strong>：调用记录、统计分析</td></tr>
+    <tr><td>权限管理</td><td>/system/permission</td><td>335</td><td>角色权限管理</td></tr>
+    <tr><td>登录页</td><td>/login</td><td>159</td><td>用户登录</td></tr>
+    <tr><td>布局框架</td><td>layout</td><td>266</td><td>侧边栏、顶栏、路由出口</td></tr>
+  </table>
+</div>
+
+<!-- 六、数据库分析 -->
+<div class="card">
+  <h2><span class="icon">6</span>数据库分析</h2>
+  <div id="chart-db-tables" class="chart-container"></div>
+  <h3>20 张表分类明细</h3>
+  <table>
+    <tr><th>分类</th><th>表名</th><th>说明</th></tr>
+    <tr><td rowspan="5"><span class="tag tag-purple">AI 大模型 (3)</span></td><td><code>ai_model_config</code></td><td>AI 模型配置（新增）</td></tr>
+    <tr><td><code>ai_call_log</code></td><td>AI 调用日志（新增）</td></tr>
+    <tr><td><code>ai_prompt_template</code></td><td>Prompt 模板（新增）</td></tr>
+    <tr><td><code>ai_article_content</code></td><td>AI 生成文章内容</td></tr>
+    <tr><td><code>ai_diagnose_task</code></td><td>AI 诊断任务</td></tr>
+    <tr><td rowspan="3"><span class="tag tag-blue">用户权限 (3)</span></td><td><code>user_info</code></td><td>用户信息</td></tr>
+    <tr><td><code>role_permission</code></td><td>角色权限</td></tr>
+    <tr><td><code>tenant</code></td><td>租户（多租户）</td></tr>
+    <tr><td rowspan="3"><span class="tag tag-green">业务核心 (3)</span></td><td><code>brand_info</code></td><td>品牌信息</td></tr>
+    <tr><td><code>brand_knowledge</code></td><td>品牌知识库</td></tr>
+    <tr><td><code>distribute_task</code></td><td>分发任务</td></tr>
+    <tr><td rowspan="2"><span class="tag tag-cyan">RAG (2)</span></td><td><code>knowledge_chunk</code></td><td>知识分块（向量存储）</td></tr>
+    <tr><td><code>knowledge_version_history</code></td><td>知识版本历史</td></tr>
+    <tr><td rowspan="3"><span class="tag tag-orange">开放 API (3)</span></td><td><code>api_key</code></td><td>API Key 管理</td></tr>
+    <tr><td><code>webhook_subscription</code></td><td>Webhook 订阅</td></tr>
+    <tr><td><code>webhook_delivery</code></td><td>Webhook 投递记录</td></tr>
+    <tr><td rowspan="2"><span class="tag tag-red">系统监控 (2)</span></td><td><code>data_monitor_stat</code></td><td>数据监控统计</td></tr>
+    <tr><td><code>asset_record</code></td><td>资产存证记录</td></tr>
+    <tr><td><span class="tag tag-blue">系统 (1)</span></td><td><code>system_config</code></td><td>系统配置</td></tr>
+    <tr><td><span class="tag tag-green">审计 (1)</span></td><td><code>system_audit_log</code></td><td>系统审计日志</td></tr>
+  </table>
+</div>
+
+<!-- 七、测试与质量 -->
+<div class="card">
+  <h2><span class="icon">7</span>测试与代码质量</h2>
+  <div class="stats-grid">
+    <div class="stat-box green"><div class="num">16</div><div class="label">测试类</div></div>
+    <div class="stat-box"><div class="num">189</div><div class="label">测试用例</div></div>
+    <div class="stat-box orange"><div class="num">2,584</div><div class="label">测试代码行数</div></div>
+    <div class="stat-box cyan"><div class="num">~28%</div><div class="label">测试代码占比</div></div>
+  </div>
+  <h3>测试覆盖模块</h3>
+  <table>
+    <tr><th>测试类</th><th>覆盖模块</th></tr>
+    <tr><td>AuthServiceTest</td><td>认证授权</td></tr>
+    <tr><td>ContentServiceTest</td><td>内容创作</td></tr>
+    <tr><td>KnowledgeServiceTest</td><td>知识管理</td></tr>
+    <tr><td>DiagnoseServiceTest</td><td>AI 诊断</td></tr>
+    <tr><td>DistributeServiceTest</td><td>多渠道分发</td></tr>
+    <tr><td>MonitorServiceTest</td><td>数据监控</td></tr>
+    <tr><td>GeoDataCollectorServiceTest</td><td>GEO 数据采集</td></tr>
+    <tr><td>AaoEngineTest</td><td>AAO 引擎</td></tr>
+    <tr><td>GeoContentValidatorTest</td><td>GEO 内容校验</td></tr>
+    <tr><td>RagServiceTest</td><td>RAG 检索增强</td></tr>
+    <tr><td>EmbeddingServiceTest</td><td>Embedding 服务</td></tr>
+    <tr><td>TextChunkerTest</td><td>文本分块</td></tr>
+    <tr><td>VectorStoreServiceTest</td><td>向量存储</td></tr>
+    <tr><td>ApiKeyServiceTest</td><td>API Key 管理</td></tr>
+    <tr><td>WebhookSubscriptionServiceTest</td><td>Webhook 订阅</td></tr>
+    <tr><td>WebhookEventPublisherTest</td><td>Webhook 事件发布</td></tr>
+    <tr><td>StatisticsServiceTest</td><td>统计分析</td></tr>
+  </table>
+  <p style="margin-top:12px;color:#e6a23c">⚠️ 注意：新增的 AI 大模型架构模块（AiModelConfigService、AiChatService、AiCallLogService、AiPromptTemplateService）<strong>尚未编写单元测试</strong>，建议补充。</p>
+</div>
+
+<!-- 八、部署运维 -->
+<div class="card">
+  <h2><span class="icon">8</span>部署与运维</h2>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="num">4</div><div class="label">环境配置 (dev/local/prod/default)</div></div>
+    <div class="stat-box green"><div class="num">3</div><div class="label">部署方式 (Docker/本地/信创)</div></div>
+    <div class="stat-box orange"><div class="num">5</div><div class="label">Prometheus 自定义指标</div></div>
+    <div class="stat-box cyan"><div class="num">2</div><div class="label">日志格式 (dev文本/prod JSON)</div></div>
+  </div>
+  <h3>部署配置清单</h3>
+  <table>
+    <tr><th>文件</th><th>用途</th></tr>
+    <tr><td><code>Dockerfile</code></td><td>多阶段多架构构建（AMD64/ARM64 飞腾鲲鹏），非 root 用户，健康检查</td></tr>
+    <tr><td><code>docker-compose.yml</code></td><td>标准编排（MySQL + Redis + RabbitMQ + 后端）</td></tr>
+    <tr><td><code>docker-compose.xinchuang.yml</code></td><td>信创版编排（MySQL/达梦/金仓三 Profile）</td></tr>
+    <tr><td><code>deploy.sh</code></td><td>Linux 一键部署脚本（--db dm/kingbase、--stop/--restart/logs/status）</td></tr>
+    <tr><td><code>deploy.ps1 / start.ps1</code></td><td>Windows 部署/启动脚本</td></tr>
+    <tr><td><code>start-local.bat</code></td><td>Windows 本地一键启动（端口 6007，0.0.0.0）</td></tr>
+    <tr><td><code>.env.example</code></td><td>环境变量模板（含 MySQL/达梦/金仓配置示例）</td></tr>
+    <tr><td><code>application-local.yml</code></td><td>本地部署配置（端口 6007、AI 模拟模式、关闭 RabbitMQ 健康检查）</td></tr>
+    <tr><td><code>application-prod.yml</code></td><td>生产配置全外部化</td></tr>
+    <tr><td><code>logback-spring.xml</code></td><td>dev 文本/prod JSON 双格式，TraceId MDC 传递</td></tr>
+  </table>
+  <h3>可观测性</h3>
+  <ul style="margin-left:20px;line-height:2">
+    <li><strong>健康检查</strong>：Actuator 暴露 health/prometheus/info/metrics</li>
+    <li><strong>结构化日志</strong>：logstash-logback-encoder，prod 环境 JSON 格式</li>
+    <li><strong>链路追踪</strong>：TraceId 过滤器，MDC 全链路传递</li>
+    <li><strong>Metrics 指标</strong>：HTTP 请求、AI 调用、采集成功失败、MQ 消息</li>
+    <li><strong>AI 调用监控</strong>：ai_call_log 表记录每次调用的 token/费用/耗时/状态</li>
+  </ul>
+</div>
+
+<!-- 九、优势与不足 -->
+<div class="card">
+  <h2><span class="icon">9</span>优势与不足</h2>
+  <div class="chart-row">
+    <div>
+      <h3 style="color:#67c23a">✅ 核心优势（10 项）</h3>
+      <ul class="advantage-list">
+        <li><strong>AI 大模型底层架构完整</strong>：统一调用入口、多模型支持、自定义配置、故障降级、调用日志、费用统计，架构设计专业</li>
+        <li><strong>企业级能力齐全</strong>：多租户 SaaS、RAG 向量检索、开放 API/Webhook、i18n 中英双语、可观测性、信创适配、私有化部署</li>
+        <li><strong>技术栈现代</strong>：Spring Boot 4.1.0 + Java 17 + Vue 3.5 + Vite 8 + Element Plus 2.14，版本前沿</li>
+        <li><strong>API 设计规范</strong>：122 个 REST 端点，统一响应包装 Result，JWT + API Key 双鉴权</li>
+        <li><strong>测试覆盖较全</strong>：16 个测试类、189 个用例，覆盖核心业务模块</li>
+        <li><strong>部署方案完善</strong>：Docker 多架构、docker-compose、信创适配、一键部署脚本、环境变量外部化</li>
+        <li><strong>数据库设计合理</strong>：20 张表，多租户字段统一，逻辑删除，时间戳自动填充</li>
+        <li><strong>安全机制健全</strong>：Spring Security + JWT、密码加密、API Key 管理、Webhook HMAC 签名、CORS 配置</li>
+        <li><strong>文档体系完整</strong>：14 份技术文档 + 9 份根目录文档，涵盖架构、部署、开发、运维</li>
+        <li><strong>前端体验良好</strong>：Element Plus 组件库、ECharts 图表、i18n 双语、响应式布局</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="color:#f56c6c">⚠️ 存在不足（9 项）</h3>
+      <ul class="issue-list">
+        <li><strong>AI 模块缺少单元测试</strong>：新增的 AiChatService/AiModelConfigService 等 4 个 Service 未编写测试</li>
+        <li><strong>无 Flyway 自动迁移</strong>：V1-V5 迁移脚本需手动执行，未集成 Flyway/Liquibase 自动版本管理</li>
+        <li><strong>无 API 文档自动生成</strong>：未集成 Swagger/OpenAPI，122 个端点缺少交互式文档</li>
+        <li><strong>无 CI/CD 流水线</strong>：缺少 GitHub Actions/GitLab CI 自动化构建、测试、部署流程</li>
+        <li><strong>AI 调用无限流熔断</strong>：缺少按模型/租户/用户维度的限流和熔断降级（Sentinel/Resilience4j）</li>
+        <li><strong>无结果缓存</strong>：相同 prompt 重复调用会重复消耗 token，缺少 Redis 缓存层</li>
+        <li><strong>向量库为内存实现</strong>：RAG 向量存储为内存计算，未集成 Milvus/Qdrant/Chroma 等专业向量数据库</li>
+        <li><strong>前端无 TypeScript</strong>：前端为纯 JS，缺少类型安全，大型项目维护成本较高</li>
+        <li><strong>无流式输出</strong>：AI 对话为同步阻塞模式，未支持 SSE 流式响应，长文本用户体验待提升</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 十、改进建议 -->
+<div class="card">
+  <h2><span class="icon">10</span>改进建议与路线图</h2>
+  <div id="chart-priority" class="chart-container" style="height:350px"></div>
+  <table>
+    <tr><th>优先级</th><th>建议项</th><th>预期收益</th><th>工作量</th></tr>
+    <tr>
+      <td><span class="priority-p0">P0</span></td>
+      <td><strong>集成 Flyway 数据库迁移</strong></td><td>自动版本管理，环境一致性保障</td><td>中（1-2天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p0">P0</span></td>
+      <td><strong>集成 Swagger/OpenAPI 文档</strong></td><td>122 个端点交互式文档，降低对接成本</td><td>低（0.5天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p0">P0</span></td>
+      <td><strong>补充 AI 模块单元测试</strong></td><td>保障核心 AI 调用链路质量</td><td>中（1-2天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p1">P1</span></td>
+      <td><strong>AI 调用限流熔断</strong></td><td>防止 API Key 被刷爆，故障自动熔断</td><td>中（2-3天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p1">P1</span></td>
+      <td><strong>CI/CD 流水线</strong></td><td>自动化构建测试部署，提升交付效率</td><td>中（2天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p1">P1</span></td>
+      <td><strong>AI 响应流式输出 (SSE)</strong></td><td>长文本实时展示，用户体验大幅提升</td><td>中（2天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p2">P2</span></td>
+      <td><strong>AI 调用结果缓存</strong></td><td>降低 token 消耗，节省 API 费用</td><td>低（1天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p2">P2</span></td>
+      <td><strong>前端 TypeScript 改造</strong></td><td>类型安全，提升可维护性</td><td>高（5-7天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p2">P2</span></td>
+      <td><strong>模型用量配额管理</strong></td><td>按租户/用户设置月度调用配额</td><td>中（2天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p3">P3</span></td>
+      <td><strong>集成专业向量数据库</strong></td><td>Milvus/Qdrant，支持大规模向量检索</td><td>高（5天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p3">P3</span></td>
+      <td><strong>Function Calling / Agent 能力</strong></td><td>AI 调用外部工具，实现智能 Agent</td><td>高（5-7天）</td>
+    </tr>
+    <tr>
+      <td><span class="priority-p3">P3</span></td>
+      <td><strong>本地大模型深度集成</strong></td><td>Ollama/vLLM 私有化部署，数据不出域</td><td>中（3天）</td>
+    </tr>
+  </table>
+</div>
+
+<!-- 十一、技术栈总览 -->
+<div class="card">
+  <h2><span class="icon">11</span>技术栈总览</h2>
+  <div class="chart-row">
+    <div>
+      <h3>后端技术栈</h3>
+      <table>
+        <tr><th>类别</th><th>技术</th><th>版本</th></tr>
+        <tr><td>框架</td><td>Spring Boot</td><td>4.1.0</td></tr>
+        <tr><td>语言</td><td>Java</td><td>17</td></tr>
+        <tr><td>ORM</td><td>MyBatis-Plus</td><td>3.5.17</td></tr>
+        <tr><td>数据库</td><td>MySQL</td><td>8.0</td></tr>
+        <tr><td>缓存</td><td>Redis</td><td>7</td></tr>
+        <tr><td>消息队列</td><td>RabbitMQ</td><td>3.12</td></tr>
+        <tr><td>安全</td><td>Spring Security + jjwt</td><td>0.12.x</td></tr>
+        <tr><td>工具库</td><td>Hutool + Lombok</td><td>-</td></tr>
+        <tr><td>监控</td><td>Micrometer + Actuator</td><td>-</td></tr>
+        <tr><td>日志</td><td>Logback + logstash-encoder</td><td>-</td></tr>
+        <tr><td>测试</td><td>JUnit 5 + Mockito</td><td>-</td></tr>
+        <tr><td>构建</td><td>Maven</td><td>-</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>前端技术栈</h3>
+      <table>
+        <tr><th>类别</th><th>技术</th><th>版本</th></tr>
+        <tr><td>框架</td><td>Vue</td><td>3.5.41</td></tr>
+        <tr><td>构建工具</td><td>Vite</td><td>8.2.1</td></tr>
+        <tr><td>UI 组件库</td><td>Element Plus</td><td>2.14.4</td></tr>
+        <tr><td>状态管理</td><td>Pinia</td><td>4.0.3</td></tr>
+        <tr><td>路由</td><td>Vue Router</td><td>5.2.0</td></tr>
+        <tr><td>图表</td><td>ECharts</td><td>6.1.0</td></tr>
+        <tr><td>国际化</td><td>vue-i18n</td><td>9.14.4</td></tr>
+        <tr><td>HTTP 客户端</td><td>Axios</td><td>1.19.0</td></tr>
+        <tr><td>CSS 预处理器</td><td>Sass</td><td>-</td></tr>
+      </table>
+      <h3 style="margin-top:20px">基础设施</h3>
+      <table>
+        <tr><th>类别</th><th>技术</th></tr>
+        <tr><td>容器化</td><td>Docker 多架构 (AMD64/ARM64)</td></tr>
+        <tr><td>编排</td><td>Docker Compose</td></tr>
+        <tr><td>信创适配</td><td>达梦 DM / 人大金仓 KingBase</td></tr>
+        <tr><td>AI 协议</td><td>OpenAI 兼容 (/chat/completions)</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <p>GEO-SaaS 项目全面分析报告 v2.0 · 生成于 2026-09-09</p>
+  <p>分析范围：后端 147 文件/9314 行 · 前端 17 页面/5451 行 · 数据库 20 表 · API 122 端点 · 测试 16 类/189 用例</p>
+</div>
+
+</div>
+
+<script>
+// 后端模块文件数饼图
+var chart1 = echarts.init(document.getElementById('chart-module-files'));
+chart1.setOption({
+  title: { text: '后端模块文件数分布', left: 'center', textStyle: { fontSize: 14 } },
+  tooltip: { trigger: 'item', formatter: '{b}: {c} 文件 ({d}%)' },
+  legend: { type: 'scroll', orient: 'vertical', right: 10, top: 40, bottom: 20 },
+  series: [{
+    type: 'pie', radius: ['40%', '70%'], center: ['40%', '55%'],
+    avoidLabelOverlap: false, label: { show: false }, emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+    data: [
+      { value: 16, name: 'ai (AI大模型)' },
+      { value: 15, name: 'openapi (开放API)' },
+      { value: 10, name: 'monitor (监控)' },
+      { value: 10, name: 'rag (RAG检索)' },
+      { value: 10, name: 'system (系统)' },
+      { value: 9, name: 'content (内容)' },
+      { value: 8, name: 'auth (认证)' },
+      { value: 8, name: 'knowledge (知识)' },
+      { value: 6, name: 'distribute (分发)' },
+      { value: 5, name: 'diagnose (诊断)' },
+      { value: 4, name: 'asset (资产)' },
+      { value: 4, name: 'geo (GEO)' },
+      { value: 2, name: 'statistics (统计)' }
+    ]
+  }]
+});
+
+// 后端模块代码行数柱状图
+var chart2 = echarts.init(document.getElementById('chart-module-lines'));
+var modules = ['ai','openapi','monitor','rag','system','content','auth','knowledge','distribute','diagnose','asset','geo','stats'];
+var lines = [1200, 1100, 750, 700, 700, 650, 550, 550, 420, 350, 280, 280, 140];
+chart2.setOption({
+  title: { text: '后端模块代码行数分布', left: 'center', textStyle: { fontSize: 14 } },
+  tooltip: { trigger: 'axis' },
+  grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+  xAxis: { type: 'category', data: modules, axisLabel: { rotate: 30, fontSize: 11 } },
+  yAxis: { type: 'value', name: '代码行数' },
+  series: [{
+    type: 'bar', data: lines, barWidth: '50%',
+    itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#667eea' }, { offset: 1, color: '#764ba2' }]), borderRadius: [4, 4, 0, 0] },
+    label: { show: true, position: 'top', fontSize: 10 }
+  }]
+});
+
+// 数据库表分类饼图
+var chart3 = echarts.init(document.getElementById('chart-db-tables'));
+chart3.setOption({
+  title: { text: '数据库表分类分布（共 20 张）', left: 'center', textStyle: { fontSize: 14 } },
+  tooltip: { trigger: 'item', formatter: '{b}: {c} 张 ({d}%)' },
+  legend: { bottom: 10 },
+  series: [{
+    type: 'pie', radius: ['35%', '65%'], center: ['50%', '45%'],
+    label: { formatter: '{b}\n{c}张', fontSize: 12 },
+    data: [
+      { value: 5, name: 'AI大模型', itemStyle: { color: '#9c27b0' } },
+      { value: 3, name: '用户权限', itemStyle: { color: '#409eff' } },
+      { value: 3, name: '业务核心', itemStyle: { color: '#67c23a' } },
+      { value: 2, name: 'RAG检索', itemStyle: { color: '#00bcd4' } },
+      { value: 3, name: '开放API', itemStyle: { color: '#e6a23c' } },
+      { value: 2, name: '系统监控', itemStyle: { color: '#f56c6c' } },
+      { value: 1, name: '系统配置', itemStyle: { color: '#909399' } },
+      { value: 1, name: '审计日志', itemStyle: { color: '#ff9800' } }
+    ]
+  }]
+});
+
+// 改进建议优先级散点图
+var chart4 = echarts.init(document.getElementById('chart-priority'));
+chart4.setOption({
+  title: { text: '改进建议优先级矩阵（收益 vs 工作量）', left: 'center', textStyle: { fontSize: 14 } },
+  tooltip: { trigger: 'item', formatter: function(p) { return p.data[3] + '<br/>优先级: ' + p.data[4] + '<br/>收益: ' + p.data[0] + '<br/>工作量: ' + p.data[1]; } },
+  grid: { left: '8%', right: '15%', bottom: '12%', containLabel: true },
+  xAxis: { name: '预期收益 →', type: 'value', min: 0, max: 10, splitLine: { lineStyle: { type: 'dashed' } } },
+  yAxis: { name: '工作量（天）→', type: 'value', min: 0, max: 8, splitLine: { lineStyle: { type: 'dashed' } } },
+  series: [{
+    type: 'scatter', symbolSize: function(d) { return d[2] * 8; },
+    label: { show: true, formatter: function(p) { return p.data[3]; }, position: 'right', fontSize: 11 },
+    data: [
+      [9, 0.5, 5, 'Swagger文档', 'P0'],
+      [9, 1.5, 5, 'Flyway迁移', 'P0'],
+      [8, 1.5, 5, 'AI模块测试', 'P0'],
+      [8, 2.5, 4, '限流熔断', 'P1'],
+      [7, 2, 4, 'CI/CD', 'P1'],
+      [8, 2, 4, '流式输出', 'P1'],
+      [6, 1, 3, '结果缓存', 'P2'],
+      [5, 6, 3, 'TS改造', 'P2'],
+      [6, 2, 3, '用量配额', 'P2'],
+      [5, 5, 2, '向量数据库', 'P3'],
+      [6, 6, 2, 'Function Call', 'P3'],
+      [5, 3, 2, '本地大模型', 'P3']
+    ],
+    itemStyle: { color: function(p) { var c = { 'P0': '#f56c6c', 'P1': '#e6a23c', 'P2': '#409eff', 'P3': '#909399' }; return c[p.data[4]]; }, opacity: 0.8 }
+  }]
+});
+
+window.addEventListener('resize', function() { chart1.resize(); chart2.resize(); chart3.resize(); chart4.resize(); });
+</script>
+</body>
+</html>

@@ -69,3 +69,7 @@ tooling/
 # Python 缓存（py_compile 等产生，非源码）
 __pycache__/
 *.pyc
+
+# 本地调试截图 / 排障产物
+screenshot_issue.png
+*.screenshot.png

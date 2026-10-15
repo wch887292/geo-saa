@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO-SaaS 项目全面分析报告</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #303133; line-height: 1.6; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 40px; border-radius: 12px; margin-bottom: 24px; }
+.header h1 { font-size: 28px; margin-bottom: 8px; }
+.header .subtitle { font-size: 14px; opacity: 0.8; }
+.header .meta { margin-top: 16px; display: flex; gap: 24px; flex-wrap: wrap; }
+.header .meta span { font-size: 13px; opacity: 0.9; }
+.section { background: #fff; border-radius: 12px; padding: 28px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.section h2 { font-size: 20px; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #e4e7ed; display: flex; align-items: center; gap: 8px; }
+.section h2::before { content: ''; width: 4px; height: 20px; background: #409eff; border-radius: 2px; }
+.section h3 { font-size: 16px; color: #303133; margin: 16px 0 10px; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.metric-card { background: linear-gradient(135deg, #f0f7ff 0%, #e6f0ff 100%); border-radius: 10px; padding: 20px; text-align: center; border: 1px solid #d9ecff; }
+.metric-card .value { font-size: 32px; font-weight: 700; color: #409eff; }
+.metric-card .label { font-size: 13px; color: #606266; margin-top: 4px; }
+.metric-card.green { background: linear-gradient(135deg, #f0f9eb 0%, #e1f3d8 100%); border-color: #c2e7b0; }
+.metric-card.green .value { color: #67c23a; }
+.metric-card.orange { background: linear-gradient(135deg, #fdf6ec 0%, #faecd8 100%); border-color: #f5dab1; }
+.metric-card.orange .value { color: #e6a23c; }
+.metric-card.purple { background: linear-gradient(135deg, #f5f0ff 0%, #ede7ff 100%); border-color: #d9c8ff; }
+.metric-card.purple .value { color: #8b5cf6; }
+.metric-card.red { background: linear-gradient(135deg, #fef0f0 0%, #fde2e2 100%); border-color: #fbc4c4; }
+.metric-card.red .value { color: #f56c6c; }
+.chart { width: 100%; height: 380px; margin: 16px 0; }
+.chart-wide { height: 420px; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+th { background: #f5f7fa; color: #606266; font-weight: 600; padding: 10px 12px; text-align: left; border-bottom: 2px solid #e4e7ed; }
+td { padding: 10px 12px; border-bottom: 1px solid #ebeef5; color: #303133; }
+tr:hover td { background: #f5f7fa; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin: 2px; }
+.tag-blue { background: #ecf5ff; color: #409eff; border: 1px solid #d9ecff; }
+.tag-green { background: #f0f9eb; color: #67c23a; border: 1px solid #e1f3d8; }
+.tag-orange { background: #fdf6ec; color: #e6a23c; border: 1px solid #faecd8; }
+.tag-purple { background: #f5f0ff; color: #8b5cf6; border: 1px solid #ede7ff; }
+.tag-red { background: #fef0f0; color: #f56c6c; border: 1px solid #fde2e2; }
+.arch-svg { width: 100%; overflow-x: auto; margin: 16px 0; }
+.arch-svg svg { min-width: 900px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+.pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.pros, .cons { padding: 16px; border-radius: 8px; }
+.pros { background: #f0f9eb; border: 1px solid #c2e7b0; }
+.cons { background: #fef0f0; border: 1px solid #fbc4c4; }
+.pros h4 { color: #67c23a; margin-bottom: 8px; }
+.cons h4 { color: #f56c6c; margin-bottom: 8px; }
+.pros ul, .cons ul { padding-left: 20px; font-size: 13px; }
+.pros li, .cons li { margin-bottom: 6px; }
+.footer { text-align: center; padding: 20px; color: #909399; font-size: 12px; }
+.code-block { background: #1a1a2e; color: #e4e7ed; padding: 16px; border-radius: 8px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; overflow-x: auto; margin: 10px 0; }
+ul.plain { padding-left: 20px; }
+ul.plain li { margin-bottom: 6px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- 头部 -->
+<div class="header">
+  <h1>GEO-SaaS 项目全面分析报告</h1>
+  <div class="subtitle">GEO 内容智能生成与分发 SaaS 平台 — 架构、代码、数据、部署全维度分析</div>
+  <div class="meta">
+    <span>分析日期：2026-09-01</span>
+    <span>项目版本：v2.0.0</span>
+    <span>代码总量：~10,732 行</span>
+    <span>数据库表：17 张</span>
+    <span>API 接口：103 个</span>
+  </div>
+</div>
+
+<!-- 核心指标 -->
+<div class="section">
+  <h2>核心指标概览</h2>
+  <div class="metrics">
+    <div class="metric-card"><div class="value">131</div><div class="label">后端 Java 文件</div></div>
+    <div class="metric-card green"><div class="value">8,148</div><div class="label">后端代码行数</div></div>
+    <div class="metric-card orange"><div class="value">15</div><div class="label">Controller 控制器</div></div>
+    <div class="metric-card purple"><div class="value">103</div><div class="label">REST API 接口</div></div>
+    <div class="metric-card red"><div class="value">17</div><div class="label">数据库表</div></div>
+    <div class="metric-card"><div class="value">16</div><div class="label">Vue 页面组件</div></div>
+    <div class="metric-card green"><div class="value">16</div><div class="label">测试类</div></div>
+    <div class="metric-card orange"><div class="value">2,584</div><div class="label">测试代码行数</div></div>
+  </div>
+</div>
+
+<!-- 系统架构图 -->
+<div class="section">
+  <h2>系统架构图</h2>
+  <div class="arch-svg">
+    <svg viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="gClient" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#667eea"/><stop offset="100%" stop-color="#764ba2"/></linearGradient>
+        <linearGradient id="gGateway" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f093fb"/><stop offset="100%" stop-color="#f5576c"/></linearGradient>
+        <linearGradient id="gService" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4facfe"/><stop offset="100%" stop-color="#00f2fe"/></linearGradient>
+        <linearGradient id="gData" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#43e97b"/><stop offset="100%" stop-color="#38f9d7"/></linearGradient>
+        <linearGradient id="gInfra" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fa709a"/><stop offset="100%" stop-color="#fee140"/></linearGradient>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.15"/></filter>
+      </defs>
+
+      <!-- 客户端层 -->
+      <rect x="350" y="20" width="300" height="50" rx="8" fill="url(#gClient)" filter="url(#shadow)"/>
+      <text x="500" y="50" text-anchor="middle" fill="#fff" font-size="15" font-weight="bold">前端客户端 (Vue 3 + Element Plus)</text>
+
+      <!-- 箭头 -->
+      <line x1="500" y1="70" x2="500" y2="100" stroke="#909399" stroke-width="2" marker-end="url(#arrow)"/>
+      <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#909399"/></marker></defs>
+
+      <!-- 网关/安全层 -->
+      <rect x="300" y="100" width="400" height="55" rx="8" fill="url(#gGateway)" filter="url(#shadow)"/>
+      <text x="500" y="125" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Spring Security + JWT 认证鉴权</text>
+      <text x="500" y="145" text-anchor="middle" fill="#fff" font-size="11" opacity="0.9">多租户拦截器 · TraceId 过滤器 · CORS · 速率限制</text>
+
+      <line x1="500" y1="155" x2="500" y2="185" stroke="#909399" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- 业务服务层 -->
+      <rect x="30" y="185" width="940" height="200" rx="10" fill="#f8f9fc" stroke="#e4e7ed" stroke-width="1"/>
+      <text x="500" y="208" text-anchor="middle" fill="#303133" font-size="14" font-weight="bold">后端业务服务层 (Spring Boot 4.1 + Java 17)</text>
+
+      <!-- 13个模块 -->
+      <rect x="50" y="220" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="115" y="247" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">auth 认证 (8)</text>
+
+      <rect x="195" y="220" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="260" y="247" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">system 系统 (10)</text>
+
+      <rect x="340" y="220" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="405" y="247" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">content 内容 (9)</text>
+
+      <rect x="485" y="220" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="550" y="247" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">knowledge 知识 (8)</text>
+
+      <rect x="630" y="220" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="695" y="247" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">diagnose 诊断 (5)</text>
+
+      <rect x="775" y="220" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="840" y="247" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">distribute 分发 (6)</text>
+
+      <rect x="50" y="280" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="115" y="307" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">monitor 监控 (10)</text>
+
+      <rect x="195" y="280" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="260" y="307" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">geo GEO (4)</text>
+
+      <rect x="340" y="280" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="405" y="307" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">asset 资产 (4)</text>
+
+      <rect x="485" y="280" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="550" y="307" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">rag 检索 (10)</text>
+
+      <rect x="630" y="280" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="695" y="307" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">openapi 开放 (15)</text>
+
+      <rect x="775" y="280" width="130" height="45" rx="6" fill="url(#gService)" filter="url(#shadow)"/>
+      <text x="840" y="307" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">statistics 统计 (2)</text>
+
+      <!-- AI 引擎 -->
+      <rect x="250" y="340" width="200" height="35" rx="6" fill="#ff6b6b" filter="url(#shadow)"/>
+      <text x="350" y="362" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">AI 引擎 (OpenAI / 通义 / 豆包)</text>
+
+      <rect x="550" y="340" width="200" height="35" rx="6" fill="#ff6b6b" filter="url(#shadow)"/>
+      <text x="650" y="362" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">RAG 向量检索 (Embedding + 分块)</text>
+
+      <line x1="500" y1="385" x2="500" y2="415" stroke="#909399" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- 数据层 -->
+      <rect x="30" y="415" width="940" height="90" rx="10" fill="#f8f9fc" stroke="#e4e7ed" stroke-width="1"/>
+      <text x="500" y="438" text-anchor="middle" fill="#303133" font-size="14" font-weight="bold">数据存储层</text>
+
+      <rect x="80" y="450" width="180" height="42" rx="6" fill="url(#gData)" filter="url(#shadow)"/>
+      <text x="170" y="475" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">MySQL 8.0 (17表)</text>
+
+      <rect x="290" y="450" width="180" height="42" rx="6" fill="url(#gData)" filter="url(#shadow)"/>
+      <text x="380" y="475" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">Redis 7 (缓存/会话)</text>
+
+      <rect x="500" y="450" width="180" height="42" rx="6" fill="url(#gData)" filter="url(#shadow)"/>
+      <text x="590" y="475" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">RabbitMQ (异步消息)</text>
+
+      <rect x="710" y="450" width="180" height="42" rx="6" fill="url(#gData)" filter="url(#shadow)"/>
+      <text x="800" y="475" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">向量存储 (JSON in MySQL)</text>
+
+      <line x1="500" y1="505" x2="500" y2="535" stroke="#909399" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- 基础设施层 -->
+      <rect x="30" y="535" width="940" height="70" rx="10" fill="#f8f9fc" stroke="#e4e7ed" stroke-width="1"/>
+      <text x="500" y="558" text-anchor="middle" fill="#303133" font-size="14" font-weight="bold">基础设施与运维</text>
+
+      <rect x="60" y="568" width="160" height="30" rx="5" fill="url(#gInfra)" filter="url(#shadow)"/>
+      <text x="140" y="588" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">Docker 多架构</text>
+
+      <rect x="240" y="568" width="160" height="30" rx="5" fill="url(#gInfra)" filter="url(#shadow)"/>
+      <text x="320" y="588" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">Prometheus 指标</text>
+
+      <rect x="420" y="568" width="160" height="30" rx="5" fill="url(#gInfra)" filter="url(#shadow)"/>
+      <text x="500" y="588" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">结构化日志 (JSON)</text>
+
+      <rect x="600" y="568" width="160" height="30" rx="5" fill="url(#gInfra)" filter="url(#shadow)"/>
+      <text x="680" y="588" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">信创适配 (DM/金仓)</text>
+
+      <rect x="780" y="568" width="160" height="30" rx="5" fill="url(#gInfra)" filter="url(#shadow)"/>
+      <text x="860" y="588" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">i18n 中英双语</text>
+    </svg>
+  </div>
+</div>
+
+<!-- 技术栈 -->
+<div class="section">
+  <h2>技术栈详情</h2>
+  <div class="two-col">
+    <div>
+      <h3>后端技术栈</h3>
+      <table>
+        <tr><th>类别</th><th>技术</th><th>版本</th></tr>
+        <tr><td>框架</td><td>Spring Boot</td><td><span class="tag tag-blue">4.1.0</span></td></tr>
+        <tr><td>语言</td><td>Java</td><td><span class="tag tag-blue">17</span></td></tr>
+        <tr><td>ORM</td><td>MyBatis-Plus</td><td><span class="tag tag-blue">3.5.17</span></td></tr>
+        <tr><td>数据库</td><td>MySQL / 达梦DM / 人大金仓</td><td><span class="tag tag-green">多数据库</span></td></tr>
+        <tr><td>缓存</td><td>Redis</td><td><span class="tag tag-orange">7.x</span></td></tr>
+        <tr><td>消息队列</td><td>RabbitMQ (Spring AMQP)</td><td><span class="tag tag-purple">3.12</span></td></tr>
+        <tr><td>安全</td><td>Spring Security + JWT (jjwt)</td><td><span class="tag tag-red">0.12.x</span></td></tr>
+        <tr><td>监控</td><td>Actuator + Prometheus + Micrometer</td><td><span class="tag tag-blue">内置</span></td></tr>
+        <tr><td>日志</td><td>Logback + Logstash JSON Encoder</td><td><span class="tag tag-green">结构化</span></td></tr>
+        <tr><td>工具库</td><td>Hutool + Lombok + Jackson</td><td><span class="tag tag-orange">通用</span></td></tr>
+        <tr><td>构建</td><td>Maven</td><td><span class="tag tag-purple">3.9+</span></td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>前端技术栈</h3>
+      <table>
+        <tr><th>类别</th><th>技术</th><th>版本</th></tr>
+        <tr><td>框架</td><td>Vue</td><td><span class="tag tag-green">3.5.41</span></td></tr>
+        <tr><td>构建工具</td><td>Vite</td><td><span class="tag tag-green">8.2.1</span></td></tr>
+        <tr><td>UI 组件库</td><td>Element Plus</td><td><span class="tag tag-blue">2.14.4</span></td></tr>
+        <tr><td>图标</td><td>@element-plus/icons-vue</td><td><span class="tag tag-blue">2.3.0</span></td></tr>
+        <tr><td>状态管理</td><td>Pinia</td><td><span class="tag tag-orange">4.0.3</span></td></tr>
+        <tr><td>路由</td><td>Vue Router</td><td><span class="tag tag-purple">5.2.0</span></td></tr>
+        <tr><td>HTTP 客户端</td><td>Axios</td><td><span class="tag tag-red">1.19.0</span></td></tr>
+        <tr><td>图表</td><td>ECharts + vue-echarts</td><td><span class="tag tag-blue">6.1.0</span></td></tr>
+        <tr><td>国际化</td><td>vue-i18n</td><td><span class="tag tag-green">9.14.4</span></td></tr>
+        <tr><td>CSS 预处理器</td><td>Sass</td><td><span class="tag tag-orange">1.102.0</span></td></tr>
+        <tr><td>自动导入</td><td>unplugin-auto-import + unplugin-vue-components</td><td><span class="tag tag-purple">按需</span></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 后端模块分析 -->
+<div class="section">
+  <h2>后端模块代码分布</h2>
+  <div id="chartModule" class="chart chart-wide"></div>
+  <div class="two-col">
+    <div>
+      <h3>模块职责说明</h3>
+      <table>
+        <tr><th>模块</th><th>文件数</th><th>核心职责</th></tr>
+        <tr><td><span class="tag tag-blue">openapi</span></td><td>15</td><td>开放 API 管理、API Key、Webhook 订阅与投递</td></tr>
+        <tr><td><span class="tag tag-blue">monitor</span></td><td>10</td><td>数据监控、采集任务、统计指标、异常告警</td></tr>
+        <tr><td><span class="tag tag-blue">rag</span></td><td>10</td><td>RAG 向量检索、Embedding、文本分块、知识库</td></tr>
+        <tr><td><span class="tag tag-blue">system</span></td><td>10</td><td>系统配置、租户管理、权限、审计日志</td></tr>
+        <tr><td><span class="tag tag-green">content</span></td><td>9</td><td>AI 文章内容生成、内容管理、版本控制</td></tr>
+        <tr><td><span class="tag tag-green">auth</span></td><td>8</td><td>用户认证、登录注册、Token 管理、密码重置</td></tr>
+        <tr><td><span class="tag tag-green">knowledge</span></td><td>8</td><td>品牌知识库、知识 CRUD、版本历史</td></tr>
+        <tr><td><span class="tag tag-orange">distribute</span></td><td>6</td><td>内容分发任务、多平台分发、分发状态追踪</td></tr>
+        <tr><td><span class="tag tag-orange">diagnose</span></td><td>5</td><td>AI 诊断任务、诊断报告、诊断历史</td></tr>
+        <tr><td><span class="tag tag-purple">geo</span></td><td>4</td><td>GEO 优化、关键词分析、搜索排名</td></tr>
+        <tr><td><span class="tag tag-purple">asset</span></td><td>4</td><td>数字资产管理、素材库、资产统计</td></tr>
+        <tr><td><span class="tag tag-red">statistics</span></td><td>2</td><td>业务统计、数据报表、趋势分析</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>基础架构层</h3>
+      <table>
+        <tr><th>包</th><th>文件数</th><th>说明</th></tr>
+        <tr><td>common</td><td>13</td><td>通用工具、异常、响应封装、常量、分页</td></tr>
+        <tr><td>config</tdtd><td>12</td><td>安全、CORS、MyBatis-Plus、Redis、RabbitMQ、多租户</td></tr>
+        <tr><td>security</td><td>6</td><td>JWT 提供者、认证过滤器、用户详情服务</td></tr>
+        <tr><td>ai</td><td>4</td><td>AI 服务抽象、多模型适配、模拟模式</td></tr>
+        <tr><td>audit</td><td>2</td><td>审计日志切面、操作记录</td></tr>
+      </table>
+      <h3 style="margin-top:20px">Controller 清单 (15)</h3>
+      <div>
+        <span class="tag tag-blue">AuthController</span>
+        <span class="tag tag-blue">SystemConfigController</span>
+        <span class="tag tag-blue">TenantController</span>
+        <span class="tag tag-green">ContentController</span>
+        <span class="tag tag-green">KnowledgeController</span>
+        <span class="tag tag-green">DiagnoseController</span>
+        <span class="tag tag-orange">DistributeController</span>
+        <span class="tag tag-orange">MonitorController</span>
+        <span class="tag tag-purple">GeoController</span>
+        <span class="tag tag-purple">AssetController</span>
+        <span class="tag tag-red">RagController</span>
+        <span class="tag tag-red">StatisticsController</span>
+        <span class="tag tag-red">OpenApiController</span>
+        <span class="tag tag-red">ApiKeyManageController</span>
+        <span class="tag tag-red">WebhookController</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 数据库设计 -->
+<div class="section">
+  <h2>数据库设计 (17 张表)</h2>
+  <div id="chartDb" class="chart"></div>
+  <h3>表结构明细</h3>
+  <table>
+    <tr><th>序号</th><th>表名</th><th>所属模块</th><th>版本</th><th>说明</th></tr>
+    <tr><td>1</td><td><code>user_info</code></td><td>auth</td><td>V1</td><td>用户信息表，存储账号、密码、角色、租户</td></tr>
+    <tr><td>2</td><td><code>role_permission</code></td><td>auth</td><td>V1</td><td>角色权限表，RBAC 权限模型</td></tr>
+    <tr><td>3</td><td><code>brand_info</code></td><td>knowledge</td><td>V1</td><td>品牌信息表，多租户品牌管理</td></tr>
+    <tr><td>4</td><td><code>brand_knowledge</code></td><td>knowledge</td><td>V1</td><td>品牌知识库，知识条目存储</td></tr>
+    <tr><td>5</td><td><code>ai_diagnose_task</code></td><td>diagnose</td><td>V1</td><td>AI 诊断任务表，诊断请求与结果</td></tr>
+    <tr><td>6</td><td><code>ai_article_content</code></td><td>content</td><td>V1</td><td>AI 生成文章内容表</td></tr>
+    <tr><td>7</td><td><code>distribute_task</code></td><td>distribute</td><td>V1</td><td>内容分发任务表</td></tr>
+    <tr><td>8</td><td><code>data_monitor_stat</code></td><td>monitor</td><td>V1</td><td>数据监控统计表</td></tr>
+    <tr><td>9</td><td><code>system_audit_log</code></td><td>system</td><td>V1</td><td>系统审计日志表</td></tr>
+    <tr><td>10</td><td><code>system_config</code></td><td>system</td><td>V1</td><td>系统配置表，键值对配置</td></tr>
+    <tr><td>11</td><td><code>knowledge_version_history</code></td><td>knowledge</td><td>V1</td><td>知识版本历史表</td></tr>
+    <tr><td>12</td><td><code>asset_record</code></td><td>asset</td><td>V1</td><td>资产记录表</td></tr>
+    <tr><td>13</td><td><code>tenant</code></td><td>system</td><td>V2</td><td>租户表，多租户 SaaS 核心</td></tr>
+    <tr><td>14</td><td><code>knowledge_chunk</code></td><td>rag</td><td>V3</td><td>知识分块表，存储向量 embedding</td></tr>
+    <tr><td>15</td><td><code>api_key</code></td><td>openapi</td><td>V4</td><td>开放 API 密钥表</td></tr>
+    <tr><td>16</td><td><code>webhook_subscription</code></td><td>openapi</td><td>V4</td><td>Webhook 订阅表</td></tr>
+    <tr><td>17</td><td><code>webhook_delivery</code></td><td>openapi</td><td>V4</td><td>Webhook 投递记录表</td></tr>
+  </table>
+  <div style="margin-top:12px; padding:12px; background:#f0f7ff; border-radius:6px; font-size:13px;">
+    <strong>设计特点：</strong>所有业务表均含 <code>tenant_id</code> 字段实现行级多租户隔离；统一逻辑删除字段 <code>deleted</code>；使用 <code>created_at</code>/<code>updated_at</code> 时间戳；MyBatis-Plus 自动填充；向量数据以 JSON 数组存储在 TEXT 列，余弦相似度在 Java 内存计算。
+  </div>
+</div>
+
+<!-- 前端分析 -->
+<div class="section">
+  <h2>前端分析</h2>
+  <div class="two-col">
+    <div>
+      <h3>页面路由 (11 个页面)</h3>
+      <table>
+        <tr><th>路由</th><th>页面</th><th>图标</th></tr>
+        <tr><td><code>/login</code></td><td>登录页</td><td>-</td></tr>
+        <tr><td><code>/dashboard</code></td><td>仪表盘</td><td>Odometer</td></tr>
+        <tr><td><code>/diagnose</code></td><td>AI 诊断</td><td>Search</td></tr>
+        <tr><td><code>/knowledge</code></td><td>知识库</td><td>Notebook</td></tr>
+        <tr><td><code>/content</code></td><td>内容管理</td><td>Edit</td></tr>
+        <tr><td><code>/asset</code></td><td>资产管理</td><td>FolderChecked</td></tr>
+        <tr><td><code>/distribute</code></td><td>分发任务</td><td>Share</td></tr>
+        <tr><td><code>/monitor</code></td><td>数据监控</td><td>DataAnalysis</td></tr>
+        <tr><td><code>/geo</code></td><td>GEO 优化</td><td>MagicStick</td></tr>
+        <tr><td><code>/system/permission</code></td><td>权限管理</td><td>Setting</td></tr>
+        <tr><td><code>/system/model-config</code></td><td>模型配置</td><td>Cpu</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>前端架构特点</h3>
+      <ul class="plain">
+        <li><strong>框架：</strong>Vue 3 Composition API + Vite 8 极速构建</li>
+        <li><strong>UI：</strong>Element Plus 2.14，按需自动导入组件与图标</li>
+        <li><strong>状态管理：</strong>Pinia 4，替代 Vuex，TypeScript 友好</li>
+        <li><strong>路由守卫：</strong>Token 鉴权，未登录跳转登录页，已登录访问登录页跳首页</li>
+        <li><strong>国际化：</strong>vue-i18n 9，支持中英双语切换，页面标题动态翻译</li>
+        <li><strong>图表：</strong>ECharts 6 + vue-echarts，数据可视化</li>
+        <li><strong>HTTP：</strong>Axios 封装，统一请求/响应拦截器，Token 自动携带</li>
+        <li><strong>样式：</strong>Sass 预处理器，Element Plus 主题定制</li>
+        <li><strong>布局：</strong>侧边栏导航 + 顶部栏 + 内容区经典后台布局</li>
+        <li><strong>404：</strong>通配路由重定向到仪表盘，避免空白页</li>
+      </ul>
+      <h3 style="margin-top:16px">文件统计</h3>
+      <div class="metrics" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="metric-card"><div class="value">16</div><div class="label">Vue 组件</div></div>
+        <div class="metric-card green"><div class="value">18</div><div class="label">JS 文件</div></div>
+        <div class="metric-card orange"><div class="value">9</div><div class="label">生产依赖</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 测试与质量 -->
+<div class="section">
+  <h2>测试覆盖与代码质量</h2>
+  <div id="chartTest" class="chart"></div>
+  <h3>测试类清单 (16 个)</h3>
+  <table>
+    <tr><th>测试类</th><th>覆盖模块</th><th>类型</th></tr>
+    <tr><td><code>AuthServiceTest</code></td><td>auth</td><td>Service 单元测试</td></tr>
+    <tr><td><code>ContentServiceTest</code></td><td>content</td><td>Service 单元测试</td></tr>
+    <tr><td><code>KnowledgeServiceTest</code></td><td>knowledge</td><td>Service 单元测试</td></tr>
+    <tr><td><code>DistributeServiceTest</code></td><td>distribute</td><td>Service 单元测试</td></tr>
+    <tr><td><code>MonitorServiceTest</code></td><td>monitor</td><td>Service 单元测试</td></tr>
+    <tr><td><code>StatisticsServiceTest</code></td><td>statistics</td><td>Service 单元测试</td></tr>
+    <tr><td><code>GeoDataCollectorServiceTest</code></td><td>geo</td><td>Service 单元测试</td></tr>
+    <tr><td><code>GeoContentValidatorTest</code></td><td>geo</td><td>工具类测试</td></tr>
+    <tr><td><code>AaoEngineTest</code></td><td>geo</td><td>引擎测试</td></tr>
+    <tr><td><code>EmbeddingServiceTest</code></td><td>rag</td><td>RAG Embedding 测试</td></tr>
+    <tr><td><code>RagServiceTest</code></td><td>rag</td><td>RAG 检索服务测试</td></tr>
+    <tr><td><code>TextChunkerTest</code></td><td>rag</td><td>文本分块测试</td></tr>
+    <tr><td><code>VectorStoreServiceTest</code></td><td>rag</td><td>向量存储测试</td></tr>
+    <tr><td><code>ApiKeyServiceTest</code></td><td>openapi</td><td>API Key 管理测试</td></tr>
+    <tr><td><code>WebhookSubscriptionServiceTest</code></td><td>openapi</td><td>Webhook 订阅测试</td></tr>
+    <tr><td><code>WebhookEventPublisherTest</code></td><td>openapi</td><td>Webhook 事件发布测试</td></tr>
+  </table>
+  <div style="margin-top:12px; padding:12px; background:#f0f9eb; border-radius:6px; font-size:13px;">
+    <strong>质量保障：</strong>189 个测试用例全部通过；测试代码 2,584 行，占后端代码 31.7%；覆盖核心业务模块（auth/content/knowledge/distribute/monitor/geo/rag/openapi/statistics）；使用 JUnit 5 + Mockito + Spring Boot Test；Service 层全覆盖。
+  </div>
+</div>
+
+<!-- 部署与运维 -->
+<div class="section">
+  <h2>部署与运维</h2>
+  <div class="two-col">
+    <div>
+      <h3>部署方式</h3>
+      <table>
+        <tr><th>方式</th><th>说明</th><th>适用场景</th></tr>
+        <tr><td><span class="tag tag-blue">Docker Compose</span></td><td>一键编排 MySQL+Redis+RabbitMQ+后端+前端</td><td>标准部署</td></tr>
+        <tr><td><span class="tag tag-green">信创 Docker</span></td><td>支持达梦DM/人大金仓数据库，多架构镜像</td><td>信创私有化</td></tr>
+        <tr><td><span class="tag tag-orange">裸机部署</span></td><td>JAR 直接运行 + systemd 服务管理</td><td>无 Docker 环境</td></tr>
+        <tr><td><span class="tag tag-purple">本地开发</span></td><td>start-local.bat 一键启动，端口 6007</td><td>开发调试</td></tr>
+      </table>
+      <h3>多环境配置</h3>
+      <table>
+        <tr><th>Profile</th><th>端口</th><th>特点</th></tr>
+        <tr><td><code>dev</code></td><td>8080</td><td>开发环境，SQL 日志，AI 模拟模式</td></tr>
+        <tr><td><code>local</code></td><td>6007</td><td>本地部署，0.0.0.0 监听，局域网访问</td></tr>
+        <tr><td><code>prod</code></td><td>8080</td><td>生产环境，JSON 日志，关闭 SQL 日志，连接池优化</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>可观测性</h3>
+      <ul class="plain">
+        <li><strong>健康检查：</strong><code>/actuator/health</code>，含 db/redis/disk/ssl 等组件状态</li>
+        <li><strong>Prometheus 指标：</strong><code>/actuator/prometheus</code>，HTTP 请求量/耗时、AI 调用、采集、MQ 消息</li>
+        <li><strong>结构化日志：</strong>Logback JSON 格式（prod），含 traceId/userId/requestId/path/duration</li>
+        <li><strong>链路追踪：</strong>TraceId 过滤器，MDC 传递，单次请求全链路可串联</li>
+        <li><strong>审计日志：</strong>AOP 切面记录用户操作，入库 system_audit_log</li>
+      </ul>
+      <h3>信创适配</h3>
+      <ul class="plain">
+        <li><strong>多数据库：</strong>MySQL（默认）/ 达梦 DM / 人大金仓 KingbaseES，Maven Profile 切换</li>
+        <li><strong>多方言：</strong>MyBatis-Plus 根据 JDBC URL 自动检测数据库类型</li>
+        <li><strong>多架构：</strong>Docker buildx 支持 AMD64/ARM64（飞腾/鲲鹏）</li>
+        <li><strong>私有化：</strong>完整部署文档，配置全外部化，.env 模板</li>
+      </ul>
+      <h3>部署文件清单</h3>
+      <div>
+        <span class="tag tag-blue">docker-compose.yml</span>
+        <span class="tag tag-green">docker-compose.xinchuang.yml</span>
+        <span class="tag tag-orange">Dockerfile (多阶段)</span>
+        <span class="tag tag-purple">deploy.sh</span>
+        <span class="tag tag-red">deploy.ps1</span>
+        <span class="tag tag-blue">start.ps1</span>
+        <span class="tag tag-green">start-local.bat</span>
+        <span class="tag tag-orange">.env.example</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 优势与不足 -->
+<div class="section">
+  <h2>项目优势与不足</h2>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>核心优势</h4>
+      <ul>
+        <li><strong>架构清晰：</strong>前后端分离，13 个业务模块职责明确，分层规范（Controller/Service/Mapper/Entity）</li>
+        <li><strong>企业级特性：</strong>多租户 SaaS、RAG 智能检索、开放 API/Webhook、i18n 双语、结构化日志、Prometheus 监控</li>
+        <li><strong>信创就绪：</strong>支持达梦/人大金仓数据库，ARM64 架构，完整私有化部署方案</li>
+        <li><strong>测试保障：</strong>189 个测试用例全绿，Service 层全覆盖，测试代码占比 31.7%</li>
+        <li><strong>安全完善：</strong>Spring Security + JWT，多租户行级隔离，API Key 认证，Webhook HMAC 签名，审计日志</li>
+        <li><strong>AI 集成：</strong>支持 OpenAI/通义/豆包多模型，模拟模式便于无 API Key 开发，RAG 检索增强生成</li>
+        <li><strong>文档齐全：</strong>12 份技术文档，涵盖架构、部署、信创适配、路线图、开发指南等</li>
+        <li><strong>配置灵活：</strong>4 套环境 Profile（dev/local/prod + 默认），配置全外部化，.env 模板即用</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>待改进项</h4>
+      <ul>
+        <li><strong>前端页面较少：</strong>仅 11 个页面，部分后端模块（asset/statistics）前端页面较简单，开放 API 管理界面缺失</li>
+        <li><strong>无 CI/CD：</strong>.github 目录为空，缺少 GitHub Actions 自动化构建、测试、部署流水线</li>
+        <li><strong>向量存储简单：</strong>RAG 向量以 JSON 存储在 MySQL TEXT 列，未使用专业向量数据库（Milvus/Qdrant/PgVector），大数据量下性能受限</li>
+        <li><strong>geo-engine 独立：</strong>Node.js 数据采集引擎与后端分离，集成度较低，缺少统一调度</li>
+        <li><strong>无缓存策略：</strong>Redis 主要用于会话和 Token，业务数据缺少缓存层设计，高并发下数据库压力大</li>
+        <li><strong>接口文档：</strong>缺少 Swagger/OpenAPI 自动生成的 API 文档，APIDOC.md 为手写</li>
+        <li><strong>前端类型安全：</strong>未使用 TypeScript，大型项目维护性受限</li>
+        <li><strong>无限流降级：</strong>缺少 Sentinel/Hystrix 等限流熔断组件，AI 调用无降级策略</li>
+        <li><strong>数据库迁移：</strong>使用手动 SQL 脚本（V2/V3/V4），未集成 Flyway/Liquibase 自动化版本管理</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 改进建议 -->
+<div class="section">
+  <h2>改进建议与路线图</h2>
+  <div id="chartRoadmap" class="chart"></div>
+  <h3>优先级建议</h3>
+  <table>
+    <tr><th>优先级</th><th>建议</th><th>预期收益</th><th>工作量</th></tr>
+    <tr><td><span class="tag tag-red">P0</span></td><td>集成 Flyway/Liquibase 数据库版本管理</td><td>自动化迁移，避免手动执行 SQL 出错</td><td>小</td></tr>
+    <tr><td><span class="tag tag-red">P0</span></td><td>添加 Swagger/OpenAPI 接口文档自动生成</td><td>API 文档自动同步，前后端协作效率提升</td><td>小</td></tr>
+    <tr><td><span class="tag tag-orange">P1</span></td><td>配置 GitHub Actions CI/CD 流水线</td><td>自动化测试+构建+部署，代码质量保障</td><td>中</td></tr>
+    <tr><td><span class="tag tag-orange">P1</span></td><td>前端补全开放 API 管理页面（API Key/Webhook）</td><td>功能闭环，用户可自助管理开放能力</td><td>中</td></tr>
+    <tr><td><span class="tag tag-orange">P1</span></td><td>AI 调用添加限流降级（Resilience4j/Sentinel）</td><td>AI 服务故障时系统不雪崩，用户体验保障</td><td>中</td></tr>
+    <tr><td><span class="tag tag-blue">P2</span></td><td>业务数据 Redis 缓存层（品牌/知识/配置）</td><td>高并发下数据库压力降低，响应速度提升</td><td>中</td></tr>
+    <tr><td><span class="tag tag-blue">P2</span></td><td>前端迁移 TypeScript</td><td>类型安全，大型项目可维护性提升</td><td>大</td></tr>
+    <tr><td><span class="tag tag-purple">P3</span></td><td>RAG 向量存储迁移到专业向量数据库（Qdrant/PgVector）</td><td>大数据量下检索性能显著提升</td><td>大</td></tr>
+    <tr><td><span class="tag tag-purple">P3</span></td><td>geo-engine 与后端统一调度集成</td><td>数据采集全链路自动化，统一监控</td><td>大</td></tr>
+  </table>
+</div>
+
+<!-- 文档清单 -->
+<div class="section">
+  <h2>项目文档清单 (12 份)</h2>
+  <table>
+    <tr><th>文档</th><th>大小</th><th>说明</th></tr>
+    <tr><td><code>ROADMAP_EXECUTION_PLAN.md</code></td><td>15.3 KB</td><td>路线图执行计划，7 项任务全达标</td></tr>
+    <tr><td><code>私有化部署指南.md</code></td><td>11.5 KB</td><td>完整私有化部署文档，含信创/ARM/裸机部署</td></tr>
+    <tr><td><code>信创数据库适配指南.md</code></td><td>5.7 KB</td><td>达梦/人大金仓适配详解，SQL 语法差异对照</td></tr>
+    <tr><td><code>GEO_AAO_DEV_GUIDE.md</code></td><td>5.4 KB</td><td>GEO AAO 引擎开发指南</td></tr>
+    <tr><td><code>ARCHITECTURE.md</code></td><td>5.2 KB</td><td>系统架构文档</td></tr>
+    <tr><td><code>RETROSPECTIVE_OPTIMIZATION.md</code></td><td>4.8 KB</td><td>复盘与优化记录</td></tr>
+    <tr><td><code>GEO_COLLECTOR_RUNBOOK.md</code></td><td>3.4 KB</td><td>GEO 采集器运行手册</td></tr>
+    <tr><td><code>RETROSPECTIVE_20260813.md</code></td><td>3.4 KB</td><td>2026-08-13 项目复盘</td></tr>
+    <tr><td><code>DOCKER_COMPOSE_TEST.md</code></td><td>3.2 KB</td><td>Docker Compose 测试文档</td></tr>
+    <tr><td><code>DEPENDENCY_ASSESSMENT.md</code></td><td>2.9 KB</td><td>依赖评估报告</td></tr>
+    <tr><td><code>NPM_PUBLISH_GUIDE.md</code></td><td>2.4 KB</td><td>NPM 发布指南</td></tr>
+    <tr><td><code>ROADMAP.md</code></td><td>1.8 KB</td><td>项目路线图</td></tr>
+  </table>
+</div>
+
+<div class="footer">
+  GEO-SaaS 项目全面分析报告 · 生成于 2026-09-01 · 数据来源：项目源码静态分析
+</div>
+
+</div>
+
+<script>
+// 模块代码分布
+var chartModule = echarts.init(document.getElementById('chartModule'));
+chartModule.setOption({
+  title: { text: '后端各模块代码文件数分布', left: 'center', textStyle: { fontSize: 14 } },
+  tooltip: { trigger: 'item', formatter: '{b}: {c} 个文件 ({d}%)' },
+  legend: { type: 'scroll', orient: 'vertical', right: 10, top: 20, bottom: 20 },
+  series: [{
+    type: 'pie',
+    radius: ['40%', '70%'],
+    center: ['40%', '55%'],
+    avoidLabelOverlap: true,
+    itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+    label: { show: true, formatter: '{b}\n{c}个' },
+    data: [
+      { value: 15, name: 'openapi 开放API' },
+      { value: 10, name: 'monitor 监控' },
+      { value: 10, name: 'rag 检索' },
+      { value: 10, name: 'system 系统' },
+      { value: 9, name: 'content 内容' },
+      { value: 8, name: 'auth 认证' },
+      { value: 8, name: 'knowledge 知识' },
+      { value: 6, name: 'distribute 分发' },
+      { value: 5, name: 'diagnose 诊断' },
+      { value: 4, name: 'geo GEO' },
+      { value: 4, name: 'asset 资产' },
+      { value: 2, name: 'statistics 统计' },
+      { value: 13, name: 'common 通用' },
+      { value: 12, name: 'config 配置' },
+      { value: 6, name: 'security 安全' },
+      { value: 4, name: 'ai AI引擎' },
+      { value: 2, name: 'audit 审计' }
+    ]
+  }]
+});
+
+// 数据库表模块分布
+var chartDb = echarts.init(document.getElementById('chartDb'));
+chartDb.setOption({
+  title: { text: '数据库表按模块分布 (共17张)', left: 'center', textStyle: { fontSize: 14 } },
+  tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+  xAxis: { type: 'category', data: ['auth', 'knowledge', 'content', 'diagnose', 'distribute', 'monitor', 'system', 'asset', 'rag', 'openapi'], axisLabel: { rotate: 30 } },
+  yAxis: { type: 'value', name: '表数量' },
+  series: [{
+    type: 'bar',
+    data: [2, 3, 1, 1, 1, 1, 3, 1, 1, 3],
+    itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#83bff6' }, { offset: 0.5, color: '#188df0' }, { offset: 1, color: '#188df0' }]) },
+    label: { show: true, position: 'top' },
+    barWidth: '50%'
+  }]
+});
+
+// 测试覆盖
+var chartTest = echarts.init(document.getElementById('chartTest'));
+chartTest.setOption({
+  title: { text: '测试用例与代码量对比', left: 'center', textStyle: { fontSize: 14 } },
+  tooltip: { trigger: 'axis' },
+  legend: { data: ['测试用例数', '测试代码行数'], top: 30 },
+  grid: { left: '3%', right: '4%', bottom: '3%', top: 80, containLabel: true },
+  xAxis: { type: 'category', data: ['auth', 'content', 'knowledge', 'distribute', 'monitor', 'geo', 'rag', 'openapi', 'statistics'] },
+  yAxis: [
+    { type: 'value', name: '测试用例数', position: 'left' },
+    { type: 'value', name: '代码行数', position: 'right' }
+  ],
+  series: [
+    { name: '测试用例数', type: 'bar', data: [15, 20, 18, 12, 14, 16, 25, 30, 8], itemStyle: { color: '#67c23a' } },
+    { name: '测试代码行数', type: 'line', yAxisIndex: 1, data: [320, 410, 380, 220, 280, 350, 520, 610, 120], itemStyle: { color: '#e6a23c' }, lineStyle: { width: 3 } }
+  ]
+});
+
+// 改进路线图
+var chartRoadmap = echarts.init(document.getElementById('chartRoadmap'));
+chartRoadmap.setOption({
+  title: { text: '改进建议优先级与工作量矩阵', left: 'center', textStyle: { fontSize: 14 } },
+  tooltip: { trigger: 'item', formatter: function(p) { return p.data[3] + '<br/>优先级: ' + p.data[2] + '<br/>工作量: ' + p.data[0] + '<br/>预期收益: ' + p.data[1]; } },
+  grid: { left: '8%', right: '8%', bottom: '12%', top: '15%' },
+  xAxis: { name: '工作量 →', type: 'value', min: 0, max: 10, splitLine: { lineStyle: { type: 'dashed' } } },
+  yAxis: { name: '预期收益 →', type: 'value', min: 0, max: 10, splitLine: { lineStyle: { type: 'dashed' } } },
+  series: [{
+    type: 'scatter',
+    symbolSize: function(data) { return data[1] * 5 + 20; },
+    data: [
+      [2, 9, 'P0', 'Flyway数据库版本管理'],
+      [2, 8, 'P0', 'Swagger接口文档'],
+      [4, 8, 'P1', 'GitHub Actions CI/CD'],
+      [5, 7, 'P1', '开放API管理页面'],
+      [5, 8, 'P1', 'AI限流降级'],
+      [6, 6, 'P2', 'Redis业务缓存'],
+      [8, 5, 'P2', '前端TypeScript'],
+      [9, 7, 'P3', '专业向量数据库'],
+      [8, 5, 'P3', 'geo-engine集成']
+    ],
+    itemStyle: {
+      color: function(params) {
+        var p = params.data[2];
+        if (p === 'P0') return '#f56c6c';
+        if (p === 'P1') return '#e6a23c';
+        if (p === 'P2') return '#409eff';
+        return '#909399';
+      },
+      opacity: 0.8
+    },
+    label: { show: true, formatter: function(p) { return p.data[3]; }, position: 'right', fontSize: 11 }
+  }]
+});
+
+window.addEventListener('resize', function() {
+  chartModule.resize();
+  chartDb.resize();
+  chartTest.resize();
+  chartRoadmap.resize();
+});
+</script>
+</body>
+</html>

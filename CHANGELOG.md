@@ -2,9 +2,20 @@
 
 本文件记录 GEO-SaaS 各版本的显著变更。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased] — 2026-08
+## [v2.1.0] — 2026-10
 
-本轮为工作区修复 + 系统性优化（尚未发布，随下个版本号合并）。
+路线图 7 项全量落地（可观测性 / i18n / 多租户 / RAG / 开放 API / AI 架构 / 信创适配 + 测试补全），并修复一批工作区缺陷。
+
+### 新增（Added）
+- **可观测性（P0）**：结构化 JSON 日志（logback + traceId 全链路透传）+ Prometheus 业务指标（请求量 / AI 调用耗时 / 采集成功率 / MQ 消息量）。
+- **i18n 中英切换（P1）**：后端 `MessageSource` + `AcceptHeader` 动态取词（`Result<T>` message 随语言变化）；前端 `vue-i18n` 路由 / 登录 / 侧边栏 i18n 化 + 语言切换器 + localStorage 持久化。
+- **多租户 SaaS（P1）**：`tenant_id` 行级隔离（MyBatis-Plus `TenantLineInnerInterceptor`）+ JWT 携带租户 + 超管跨租户 + `TenantController` CRUD（V2 迁移脚本）。
+- **RAG 向量库（P1）**：`TextChunker` 分块（500 字 + 50 重叠 + 句子边界）+ `EmbeddingService`（OpenAI / SHA-256 模拟）+ 向量检索 / RRF 混合重排（V3 迁移脚本）。
+- **开放 API + Webhook（P1）**：API Key 认证（`gk_` 前缀 + `X-API-Key` + 限流）+ `/api/v1/open/` 只读接口 + Webhook 订阅（HMAC-SHA256 签名 / 指数退避 / 幂等 / 投递记录）（V4 迁移脚本）。
+- **AI 模型底层架构**：模型路由 + 调用日志 + GEO/AAO 内容生成与诊断报告（V5 / V6 迁移脚本）。
+- **采集器增强**：引用强度指标（官方 / 外部引用，按品牌官网域名区分）+ 平台 AI 搜索客户端 + 实体信息校验。
+- **私有化信创**：达梦 / 人大金仓 Maven Profile + 多架构 Docker + `docker-compose.xinchuang.yml` + 一键 `deploy.sh`。
+- **测试补全（P0）**：Service 层单测 24 → 191 全绿（Auth / Content / Knowledge / Distribute / Statistics / RAG / OpenAPI）。
 
 ### 修复（Fixed）
 - **恢复 8 个被误删的配置类**：`SecurityConfig`（JWT 安全链 / 方法级鉴权 / 统一 JSON 401/403）、`RabbitMqConfig`（队列/交换机声明，被两个 MQ 监听器与 Service 引用）、`AsyncConfig`、`CorsConfig`、`RedisConfig`、`MybatisPlusConfig`（分页拦截器）、`PasswordEncoderConfig`。此前这些类被删除但代码仍引用，后端无法编译、认证/跨域/异步/分页全部失效；`WebMvcConfig` 为空壳且无引用，保持删除。

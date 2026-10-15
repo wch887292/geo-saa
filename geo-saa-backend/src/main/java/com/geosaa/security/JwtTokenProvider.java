@@ -19,6 +19,12 @@ public class JwtTokenProvider {
 
     private static final String CLAIM_TYPE = "type";
     private static final String TYPE_REFRESH = "refresh";
+    /** 租户 ID claim（#4 多租户） */
+    private static final String CLAIM_TENANT_ID = "tenantId";
+    /** 用户角色 claim（用于识别超级管理员） */
+    private static final String CLAIM_ROLE = "role";
+    /** 超级管理员角色标识 */
+    public static final String ROLE_SUPER_ADMIN = "SUPER_ADMIN";
 
     private final SecretKey secretKey;
     private final long expiration;
@@ -59,29 +65,80 @@ public class JwtTokenProvider {
         return keyBytes;
     }
 
-    public String generateToken(String username) {
+    /**
+     * 生成访问令牌（含租户 ID 与角色，#4 多租户）。
+     *
+     * @param username 用户名
+     * @param tenantId 租户 ID
+     * @param role     用户角色（SUPER_ADMIN 跳过租户过滤）
+     */
+    public String generateToken(String username, Long tenantId, String role) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(username)
+                .claim(CLAIM_TENANT_ID, tenantId)
+                .claim(CLAIM_ROLE, role)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expiration))
                 .signWith(secretKey)
                 .compact();
     }
 
-    public String generateRefreshToken(String username) {
+    /**
+     * 兼容旧调用：使用默认租户 ID。
+     * @deprecated 请使用 {@link #generateToken(String, Long, String)} 传入租户 ID
+     */
+    @Deprecated
+    public String generateToken(String username) {
+        return generateToken(username, com.geosaa.common.tenant.TenantContext.DEFAULT_TENANT_ID, "USER");
+    }
+
+    /**
+     * 生成刷新令牌（含租户 ID 与角色）。
+     */
+    public String generateRefreshToken(String username, Long tenantId, String role) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(username)
                 .claim(CLAIM_TYPE, TYPE_REFRESH)
+                .claim(CLAIM_TENANT_ID, tenantId)
+                .claim(CLAIM_ROLE, role)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + refreshExpiration))
                 .signWith(secretKey)
                 .compact();
     }
 
+    /**
+     * 兼容旧调用：使用默认租户 ID。
+     * @deprecated 请使用 {@link #generateRefreshToken(String, Long, String)}
+     */
+    @Deprecated
+    public String generateRefreshToken(String username) {
+        return generateRefreshToken(username, com.geosaa.common.tenant.TenantContext.DEFAULT_TENANT_ID, "USER");
+    }
+
     public String getUsernameFromToken(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    /**
+     * 从令牌中提取租户 ID（#4 多租户）。
+     */
+    public Long getTenantIdFromToken(String token) {
+        Object value = parseClaims(token).get(CLAIM_TENANT_ID);
+        if (value == null) {
+            return com.geosaa.common.tenant.TenantContext.DEFAULT_TENANT_ID;
+        }
+        return Long.valueOf(value.toString());
+    }
+
+    /**
+     * 从令牌中提取用户角色。
+     */
+    public String getRoleFromToken(String token) {
+        Object value = parseClaims(token).get(CLAIM_ROLE);
+        return value != null ? value.toString() : "USER";
     }
 
     /**

@@ -21,6 +21,9 @@ public class LoginResponse {
 
     private String role;
 
+    /** 租户 ID（#4 多租户） */
+    private Long tenantId;
+
     private List<String> permissions;
 
     public LoginResponse(String token, String username, String nickname, String role) {
@@ -31,13 +34,15 @@ public class LoginResponse {
         this.role = role;
     }
 
-    public LoginResponse(String token, String refreshToken, String username, String nickname, String role, List<String> permissions) {
+    public LoginResponse(String token, String refreshToken, String username, String nickname,
+                         String role, Long tenantId, List<String> permissions) {
         this.token = token;
         this.refreshToken = refreshToken;
         this.tokenType = "Bearer";
         this.username = username;
         this.nickname = nickname;
         this.role = role;
+        this.tenantId = tenantId;
         this.permissions = permissions;
     }
 }

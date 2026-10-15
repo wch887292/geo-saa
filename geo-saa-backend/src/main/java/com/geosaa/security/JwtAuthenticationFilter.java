@@ -1,6 +1,7 @@
 package com.geosaa.security;
 
 import com.geosaa.common.Constant;
+import com.geosaa.common.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +41,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             try {
                 String username = jwtTokenProvider.getUsernameFromToken(token);
+                Long tenantId = jwtTokenProvider.getTenantIdFromToken(token);
+                String role = jwtTokenProvider.getRoleFromToken(token);
+
+                // #4 多租户：设置租户上下文，超级管理员跳过租户过滤
+                TenantContext.setTenantId(tenantId);
+                TenantContext.setSuperAdmin(JwtTokenProvider.ROLE_SUPER_ADMIN.equalsIgnoreCase(role));
+
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
                 if (userDetails.isEnabled()) {
@@ -58,7 +66,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            // #4 多租户：请求结束必须清理租户上下文，防止线程池复用导致租户串号
+            TenantContext.clear();
+        }
     }
 
     private String getTokenFromRequest(HttpServletRequest request) {

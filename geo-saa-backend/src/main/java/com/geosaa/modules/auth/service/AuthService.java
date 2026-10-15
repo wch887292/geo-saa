@@ -2,6 +2,8 @@ package com.geosaa.modules.auth.service;
 
 import com.geosaa.common.exception.BusinessException;
 import com.geosaa.common.exception.UnauthorizedException;
+import com.geosaa.common.i18n.MessageUtils;
+import com.geosaa.common.tenant.TenantContext;
 import com.geosaa.modules.auth.dto.LoginRequest;
 import com.geosaa.modules.auth.dto.LoginResponse;
 import com.geosaa.modules.auth.entity.RolePermission;
@@ -45,37 +47,41 @@ public class AuthService {
         Integer attempts = (Integer) redisTemplate.opsForValue().get(attemptKey);
         if (attempts != null && attempts >= MAX_LOGIN_ATTEMPTS) {
             long ttl = redisTemplate.getExpire(attemptKey, TimeUnit.MINUTES);
-            throw new BusinessException("账号已被锁定，请" + ttl + "分钟后重试");
+            throw new BusinessException(MessageUtils.get("auth.account_locked") + "，" + ttl + "min");
         }
 
         UserInfo userInfo = userInfoMapper.selectByUsername(request.getUsername());
         if (userInfo == null) {
             recordLoginFailure(attemptKey);
-            throw new UnauthorizedException("用户名或密码错误");
+            throw new UnauthorizedException(MessageUtils.get("auth.username_or_password_error"));
         }
 
         if (!passwordEncoder.matches(request.getPassword(), userInfo.getPassword())) {
             recordLoginFailure(attemptKey);
-            throw new UnauthorizedException("用户名或密码错误");
+            throw new UnauthorizedException(MessageUtils.get("auth.username_or_password_error"));
         }
 
         if (userInfo.getStatus() != null && userInfo.getStatus() == 0) {
-            throw new BusinessException("账号已被禁用");
+            throw new BusinessException(MessageUtils.get("auth.account_disabled"));
         }
 
         // 登录成功，清除失败记录
         redisTemplate.delete(attemptKey);
 
-        String token = jwtTokenProvider.generateToken(userInfo.getUsername());
+        Long tenantId = userInfo.getTenantId() != null ? userInfo.getTenantId() : TenantContext.DEFAULT_TENANT_ID;
+        String role = userInfo.getRole();
+
+        String token = jwtTokenProvider.generateToken(userInfo.getUsername(), tenantId, role);
         // 生成刷新令牌
-        String refreshToken = jwtTokenProvider.generateRefreshToken(userInfo.getUsername());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(userInfo.getUsername(), tenantId, role);
         redisTemplate.opsForValue().set(REFRESH_TOKEN_KEY + refreshToken, userInfo.getUsername(), 7, TimeUnit.DAYS);
 
         // 获取角色权限
         List<String> permissions = getPermissionsByRole(userInfo.getRole());
 
-        log.info("用户登录成功: username={}, role={}", userInfo.getUsername(), userInfo.getRole());
-        return new LoginResponse(token, refreshToken, userInfo.getUsername(), userInfo.getNickname(), userInfo.getRole(), permissions);
+        log.info("用户登录成功: username={}, role={}, tenantId={}", userInfo.getUsername(), userInfo.getRole(), tenantId);
+        return new LoginResponse(token, refreshToken, userInfo.getUsername(), userInfo.getNickname(),
+                userInfo.getRole(), tenantId, permissions);
     }
 
     public void logout(String username, String token) {
@@ -87,30 +93,33 @@ public class AuthService {
         // 先验签：确认它确实是本服务签发的、未过期的 refresh 类型令牌，
         // 避免只靠 Redis key 存在性判断（拿到任意字符串都能试探）
         if (refreshToken == null || !jwtTokenProvider.validateRefreshToken(refreshToken)) {
-            throw new UnauthorizedException("刷新令牌无效或已过期");
+            throw new UnauthorizedException(MessageUtils.get("auth.token_invalid"));
         }
 
         String refreshKey = REFRESH_TOKEN_KEY + refreshToken;
         String username = (String) redisTemplate.opsForValue().get(refreshKey);
         if (username == null) {
-            throw new UnauthorizedException("刷新令牌无效或已过期");
+            throw new UnauthorizedException(MessageUtils.get("auth.token_invalid"));
         }
 
         UserInfo userInfo = userInfoMapper.selectByUsername(username);
         if (userInfo == null) {
-            throw new UnauthorizedException("用户不存在");
+            throw new UnauthorizedException(MessageUtils.get("auth.user_not_found"));
         }
 
         // 删除旧刷新令牌
         redisTemplate.delete(refreshKey);
 
+        Long tenantId = userInfo.getTenantId() != null ? userInfo.getTenantId() : TenantContext.DEFAULT_TENANT_ID;
+        String role = userInfo.getRole();
+
         // 生成新令牌
-        String newToken = jwtTokenProvider.generateToken(username);
-        String newRefreshToken = jwtTokenProvider.generateRefreshToken(username);
+        String newToken = jwtTokenProvider.generateToken(username, tenantId, role);
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(username, tenantId, role);
         redisTemplate.opsForValue().set(REFRESH_TOKEN_KEY + newRefreshToken, username, 7, TimeUnit.DAYS);
 
         List<String> permissions = getPermissionsByRole(userInfo.getRole());
-        return new LoginResponse(newToken, newRefreshToken, username, userInfo.getNickname(), userInfo.getRole(), permissions);
+        return new LoginResponse(newToken, newRefreshToken, username, userInfo.getNickname(), role, tenantId, permissions);
     }
 
     public UserInfo getCurrentUser(String username) {
@@ -123,7 +132,7 @@ public class AuthService {
     public Map<String, Object> getUserInfoWithPermissions(String username) {
         UserInfo userInfo = userInfoMapper.selectByUsername(username);
         if (userInfo == null) {
-            throw new UnauthorizedException("用户不存在");
+            throw new UnauthorizedException(MessageUtils.get("auth.user_not_found"));
         }
         List<String> permissions = getPermissionsByRole(userInfo.getRole());
         List<Map<String, Object>> menus = getDynamicMenus(userInfo.getRole());

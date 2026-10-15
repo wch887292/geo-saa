@@ -1,6 +1,7 @@
 package com.geosaa.common.exception;
 
 import com.geosaa.common.Result;
+import com.geosaa.common.i18n.MessageUtils;
 import jakarta.validation.ValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -64,7 +65,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
         log.warn("请求体解析失败: {}", e.getMessage());
-        return Result.error(400, "请求体格式错误或为空");
+        return Result.error(400, MessageUtils.get("common.request_body_invalid"));
     }
 
     /**
@@ -74,7 +75,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public Result<Void> handleAccessDeniedException(AccessDeniedException e) {
         log.warn("权限不足: {}", e.getMessage());
-        return Result.error(403, "权限不足，无法访问该资源");
+        return Result.error(403, MessageUtils.get("common.no_permission"));
     }
 
     /**
@@ -95,13 +96,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Result<Void> handleNotFound(Exception e) {
         log.warn("接口不存在: {}", e.getMessage());
-        return Result.error(404, "请求的接口不存在");
+        return Result.error(404, MessageUtils.get("common.interface_not_found"));
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleException(Exception e) {
         log.error("系统内部异常", e);
-        return Result.error(500, "服务器内部错误，请稍后重试");
+        return Result.error(500, MessageUtils.get("common.server_error"));
     }
 }

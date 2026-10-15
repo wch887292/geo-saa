@@ -1,0 +1,209 @@
+# ============================================================
+# GEO-SaaS 信创私有化部署 docker-compose
+# 支持 MySQL（默认）/ 达梦 DM / 人大金仓 KingbaseES
+#
+# 使用方法：
+#   1. cp .env.example .env  并修改配置
+#   2. MySQL 部署:  docker compose -f docker-compose.xinchuang.yml up -d
+#   3. 达梦部署:    DB_TYPE=dm docker compose -f docker-compose.xinchuang.yml up -d
+#   4. 金仓部署:    DB_TYPE=kingbase docker compose -f docker-compose.xinchuang.yml up -d
+# ============================================================
+
+version: '3.8'
+
+services:
+  # ---------- 数据库（MySQL 默认）----------
+  mysql:
+    image: mysql:8.0
+    container_name: geo-saa-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MYSQL_DATABASE: geo_saa
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./geo-saa-backend/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./geo-saa-backend/src/main/resources/db/V2__multi_tenant.sql:/docker-entrypoint-initdb.d/02-v2.sql
+      - ./geo-saa-backend/src/main/resources/db/V3__rag_vector.sql:/docker-entrypoint-initdb.d/03-v3.sql
+      - ./geo-saa-backend/src/main/resources/db/V4__open_api_webhook.sql:/docker-entrypoint-initdb.d/04-v4.sql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - geo-saa-net
+    profiles: ["mysql"]
+
+  # ---------- 达梦 DM（信创数据库）----------
+  dameng:
+    image: registry.cn-hangzhou.aliyuncs.com/dameng/dm8:20230808
+    container_name: geo-saa-dameng
+    restart: unless-stopped
+    environment:
+      PAGE_SIZE: 16
+      EXTENT_SIZE: 32
+      LOG_SIZE: 1024
+      UNICODE_FLAG: 1
+      LENGTH_IN_CHAR: 1
+      INSTANCE_NAME: DMSERVER
+      DB_NAME: geo_saa
+    ports:
+      - "5236:5236"
+    volumes:
+      - dameng-data:/opt/dmdbms/data
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1;' | /opt/dmdbms/bin/disql SYSDBA/SYSDBA@localhost:5236 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - geo-saa-net
+    profiles: ["dm"]
+
+  # ---------- 人大金仓 KingbaseES（信创数据库）----------
+  kingbase:
+    image: registry.cn-hangzhou.aliyuncs.com/kingbase/kingbasees:v8r6
+    container_name: geo-saa-kingbase
+    restart: unless-stopped
+    environment:
+      NEED_START: "yes"
+      DB_USER: system
+      DB_PASSWORD: ${KINGBASE_PASSWORD:-kingbase}
+      DB_NAME: geo_saa
+      DB_MODE: oracle
+    ports:
+      - "54321:54321"
+    volumes:
+      - kingbase-data:/home/kingbase/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 54321 -U system || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - geo-saa-net
+    profiles: ["kingbase"]
+
+  # ---------- Redis ----------
+  redis:
+    image: redis:7-alpine
+    container_name: geo-saa-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - geo-saa-net
+
+  # ---------- RabbitMQ（可选）----------
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: geo-saa-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - geo-saa-net
+    profiles: ["rabbitmq"]
+
+  # ---------- 后端服务 ----------
+  backend:
+    build:
+      context: ./geo-saa-backend
+      dockerfile: docker/Dockerfile
+      args:
+        DB_PROFILE: ${DB_PROFILE:-mysql}
+    image: geo-saa-backend:latest
+    container_name: geo-saa-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      # 数据库配置（根据 DB_TYPE 自动选择）
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: geo_saa
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-false}
+      # JWT（必须在 .env 中设置）
+      JWT_SECRET: ${JWT_SECRET:?请先在 .env 中设置 JWT_SECRET}
+      # CORS
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+      # AI
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_SIMULATION_ENABLED: ${AI_SIMULATION_ENABLED:-false}
+      # RAG
+      RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-text-embedding-3-small}
+      # 日志
+      LOG_LEVEL_ROOT: ${LOG_LEVEL_ROOT:-INFO}
+      LOG_LEVEL_GEOSAA: ${LOG_LEVEL_GEOSAA:-INFO}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend-logs:/app/logs
+    networks:
+      - geo-saa-net
+    # 根据数据库类型设置依赖
+    profiles: ["mysql", "dm", "kingbase"]
+
+  # ---------- 前端 ----------
+  frontend:
+    build:
+      context: ./geo-saa-frontend
+      dockerfile: Dockerfile
+    image: geo-saa-frontend:latest
+    container_name: geo-saa-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - geo-saa-net
+
+volumes:
+  mysql-data:
+  dameng-data:
+  kingbase-data:
+  redis-data:
+  rabbitmq-data:
+  backend-logs:
+
+networks:
+  geo-saa-net:
+    driver: bridge

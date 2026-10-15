@@ -53,6 +53,21 @@
             <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
 
+        <!-- 可观测性：Actuator + Prometheus + 结构化日志 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>8.0</version>
+        </dependency>
+
         <!-- Mybatis-Plus -->
         <dependency>
             <groupId>com.baomidou</groupId>
@@ -66,12 +81,16 @@
             <version>${mybatis-plus.version}</version>
         </dependency>
 
-        <!-- MySQL -->
+        <!-- MySQL（默认数据库） -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- 信创数据库驱动（达梦 DM / 人大金仓 KingbaseES）通过 Maven Profile 激活：
+             -Pdm 或 -Pkingbase。不在默认 dependencies 中声明，避免无法从中央仓库下载时构建失败。
+             使用前需手动安装到本地仓库，详见 docs/信创数据库适配指南.md -->
 
         <!-- JWT -->
         <dependency>
@@ -150,4 +169,46 @@
             </plugin>
         </plugins>
     </build>
+
+    <!-- ========== 信创数据库适配 Profiles ========== -->
+    <!-- 默认使用 MySQL；私有化部署时通过 -Pdm 或 -Pkingbase 切换国产化数据库 -->
+    <profiles>
+        <profile>
+            <id>mysql</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <db.type>mysql</db.type>
+            </properties>
+        </profile>
+        <profile>
+            <id>dm</id>
+            <properties>
+                <db.type>dm</db.type>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>com.dameng</groupId>
+                    <artifactId>DmJdbcDriver18</artifactId>
+                    <version>8.1.3.192</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>kingbase</id>
+            <properties>
+                <db.type>kingbase</db.type>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>cn.com.kingbase</groupId>
+                    <artifactId>kingbase8</artifactId>
+                    <version>8.6.0</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

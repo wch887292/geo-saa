@@ -59,6 +59,26 @@ jwt:
   expiration: ${JWT_EXPIRATION:86400000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
+# 可观测性（O3）：Actuator + Prometheus
+# dev 环境仅暴露 health（存活探针）；prod 环境暴露 health/prometheus/metrics/info，
+# 建议通过反向代理或独立 token 保护 /actuator/prometheus，不直接暴露到公网。
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,prometheus,metrics,info}
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: geo-saa-backend
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
 # 跨域配置：默认只放行本地前端，生产环境用 CORS_ALLOWED_ORIGINS 指定确切域名（逗号分隔）
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}
@@ -83,6 +103,20 @@ ai:
   simulation:
     enabled: ${AI_SIMULATION_ENABLED:true}  # 模拟模式，无 API Key 时返回模拟数据
 
+# RAG 向量知识库配置（O5）
+rag:
+  embedding:
+    model: ${RAG_EMBEDDING_MODEL:text-embedding-3-small}
+    dimensions: ${RAG_EMBEDDING_DIMENSIONS:1536}
+    simulation-dimensions: ${RAG_SIMULATION_DIMENSIONS:256}  # 模拟模式向量维度
+  chunk:
+    size: ${RAG_CHUNK_SIZE:500}       # 分块大小（字符）
+    overlap: ${RAG_CHUNK_OVERLAP:50}  # 分块重叠（字符）
+  answer:
+    max-word-count: ${RAG_ANSWER_MAX_WORDS:800}
+  default-top-k: ${RAG_DEFAULT_TOP_K:5}
+  default-min-similarity: ${RAG_DEFAULT_MIN_SIMILARITY:0.3}
+
 # GEO 真实数据采集器（G-01）
 # 默认全部关闭：显式置 enabled=true 并至少启用一个引擎 + 填入 API Key 才生效。
 # 未配置时定时任务不注册、不产生任何外部调用，也绝不写入模拟数据。
@@ -105,4 +139,34 @@ app:
         api-key: ${GEO_OPENAI_COMPAT_API_KEY:}
         api-url: ${GEO_OPENAI_COMPAT_API_URL:}
         model: ${GEO_OPENAI_COMPAT_MODEL:}
+      # 多平台配置（v2新增）：可同时启用多个大模型平台
+      # platformId 可选值: deepseek/tongyi/doubao/zhipu/kimi/xunfei/wenxin/hunyuan/360/openai/perplexity
+      platforms:
+        - platform-id: deepseek
+          enabled: ${GEO_PLATFORM_DEEPSEEK_ENABLED:false}
+          api-key: ${GEO_PLATFORM_DEEPSEEK_KEY:}
+        - platform-id: tongyi
+          enabled: ${GEO_PLATFORM_TONGYI_ENABLED:false}
+          api-key: ${GEO_PLATFORM_TONGYI_KEY:}
+        - platform-id: doubao
+          enabled: ${GEO_PLATFORM_DOUBAO_ENABLED:false}
+          api-key: ${GEO_PLATFORM_DOUBAO_KEY:}
+        - platform-id: zhipu
+          enabled: ${GEO_PLATFORM_ZHIPU_ENABLED:false}
+          api-key: ${GEO_PLATFORM_ZHIPU_KEY:}
+        - platform-id: kimi
+          enabled: ${GEO_PLATFORM_KIMI_ENABLED:false}
+          api-key: ${GEO_PLATFORM_KIMI_KEY:}
+        - platform-id: xunfei
+          enabled: ${GEO_PLATFORM_XUNFEI_ENABLED:false}
+          api-key: ${GEO_PLATFORM_XUNFEI_KEY:}
+        - platform-id: wenxin
+          enabled: ${GEO_PLATFORM_WENXIN_ENABLED:false}
+          api-key: ${GEO_PLATFORM_WENXIN_KEY:}
+        - platform-id: hunyuan
+          enabled: ${GEO_PLATFORM_HUNYUAN_ENABLED:false}
+          api-key: ${GEO_PLATFORM_HUNYUAN_KEY:}
+        - platform-id: "360"
+          enabled: ${GEO_PLATFORM_360_ENABLED:false}
+          api-key: ${GEO_PLATFORM_360_KEY:}
 

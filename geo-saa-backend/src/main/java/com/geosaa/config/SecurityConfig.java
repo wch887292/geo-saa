@@ -2,6 +2,8 @@ package com.geosaa.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geosaa.common.Result;
+import com.geosaa.common.i18n.MessageUtils;
+import com.geosaa.modules.openapi.security.ApiKeyAuthFilter;
 import com.geosaa.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
@@ -24,10 +26,14 @@ import java.nio.charset.StandardCharsets;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiKeyAuthFilter apiKeyAuthFilter;
     private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, ObjectMapper objectMapper) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          ApiKeyAuthFilter apiKeyAuthFilter,
+                          ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.apiKeyAuthFilter = apiKeyAuthFilter;
         this.objectMapper = objectMapper;
     }
 
@@ -43,15 +49,20 @@ public class SecurityConfig {
                 // 在无 token 时进入控制器后因 principal 为 null 抛 NPE 并返回 500。
                 .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                 .requestMatchers("/api/v1/system/health").permitAll()
+                // 可观测性（O3）：health 用于存活探针、prometheus 用于指标抓取，均匿名可访问。
+                // 生产环境建议通过反向代理/防火墙限制 /actuator/prometheus 的来源 IP，
+                // 或在 management.server.port 配置独立管理端口并仅内网监听。
+                .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
                 .anyRequest().authenticated()
             )
             // 未认证 / 无权限时返回统一 JSON，而不是默认的 HTML 错误页
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) ->
-                        writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, 401, "未登录或登录已过期"))
+                        writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, 401, MessageUtils.get("common.unauthorized")))
                 .accessDeniedHandler((request, response, deniedException) ->
-                        writeJson(response, HttpServletResponse.SC_FORBIDDEN, 403, "没有权限执行此操作"))
+                        writeJson(response, HttpServletResponse.SC_FORBIDDEN, 403, MessageUtils.get("common.no_permission")))
             )
+            .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

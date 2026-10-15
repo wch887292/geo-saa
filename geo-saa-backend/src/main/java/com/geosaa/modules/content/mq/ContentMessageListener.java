@@ -3,6 +3,7 @@ package com.geosaa.modules.content.mq;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geosaa.ai.AiAdapterFactory;
 import com.geosaa.common.Constant;
+import com.geosaa.common.metrics.BusinessMetrics;
 import com.geosaa.config.RabbitMqConfig;
 import com.geosaa.modules.content.entity.AiArticleContent;
 import com.geosaa.modules.content.mapper.AiArticleContentMapper;
@@ -26,6 +27,8 @@ public class ContentMessageListener {
     private final AiArticleContentMapper articleContentMapper;
     private final AiAdapterFactory aiAdapterFactory;
     private final ObjectMapper objectMapper;
+    /** 业务指标：MQ 消息处理计数（O3 可观测性） */
+    private final BusinessMetrics businessMetrics;
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_CONTENT_GENERATE)
     public void handleContentGenerate(String message) {
@@ -73,9 +76,11 @@ public class ContentMessageListener {
 
             content.setStatus(Constant.TASK_STATUS_COMPLETED); // 已完成
             articleContentMapper.updateById(content);
+            businessMetrics.incrementMqMessage(RabbitMqConfig.QUEUE_CONTENT_GENERATE, "success");
             log.info("内容生成完成: contentId={}, title={}", contentId, content.getTitle());
 
         } catch (Exception e) {
+            businessMetrics.incrementMqMessage(RabbitMqConfig.QUEUE_CONTENT_GENERATE, "failure");
             log.error("内容生成消息处理失败", e);
         }
     }

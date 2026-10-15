@@ -2,6 +2,7 @@ package com.geosaa.modules.distribute.mq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geosaa.common.Constant;
+import com.geosaa.common.metrics.BusinessMetrics;
 import com.geosaa.config.RabbitMqConfig;
 import com.geosaa.modules.common.TaskProgressService;
 import com.geosaa.modules.distribute.entity.DistributeTask;
@@ -27,6 +28,8 @@ public class DistributeMessageListener {
     private final DistributeTaskMapper distributeTaskMapper;
     private final TaskProgressService taskProgressService;
     private final ObjectMapper objectMapper;
+    /** 业务指标：MQ 消息处理计数（O3 可观测性） */
+    private final BusinessMetrics businessMetrics;
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_DISTRIBUTE_TASK)
     public void handleDistributeTask(String message) {
@@ -62,9 +65,11 @@ public class DistributeMessageListener {
             distributeTaskMapper.updateById(task);
 
             taskProgressService.completeProgress("distribute:" + taskId, task.getResultInfo());
+            businessMetrics.incrementMqMessage(RabbitMqConfig.QUEUE_DISTRIBUTE_TASK, "success");
             log.info("分发任务完成: taskId={}, platform={}", taskId, platform);
 
         } catch (Exception e) {
+            businessMetrics.incrementMqMessage(RabbitMqConfig.QUEUE_DISTRIBUTE_TASK, "failure");
             log.error("分发任务处理失败", e);
             if (message != null) {
                 try {

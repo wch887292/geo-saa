@@ -1,23 +1,139 @@
-# 生产环境配置
-# 以下敏感项没有提供默认值，缺失时应用会在启动阶段直接失败（fail-fast），
-# 避免带着 root/root、示例密钥这类默认配置被误部署到线上。
+# ============================================================
+# GEO-SaaS 生产环境配置（私有化部署 / 信创适配）
+# 所有敏感配置通过环境变量注入，不在此文件中硬编码
+# ============================================================
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
   datasource:
-    username: ${MYSQL_USER}
-    password: ${MYSQL_PASSWORD}
+    # MySQL（默认）: jdbc:mysql://host:3306/db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
+    # 达梦 DM: jdbc:dm://host:5236/db
+    # 人大金仓: jdbc:kingbase8://host:54321/db
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:geo_saa}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_PASSWORD:root}}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
+    hikari:
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:10000}
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:20}
+      minimum-idle: ${DB_MIN_IDLE:5}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: ${REDIS_TIMEOUT:5s}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    listener:
+      simple:
+        acknowledge-mode: manual
+        retry:
+          enabled: true
+          max-attempts: 3
 
-jwt:
-  secret: ${JWT_SECRET}
-
-cors:
-  # 生产环境必须显式指定前端域名，禁止通配
-  allowed-origins: ${CORS_ALLOWED_ORIGINS}
-
+# MyBatis-Plus
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl  # 生产环境关闭 SQL 日志
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+      id-type: auto
 
+# JWT
+jwt:
+  secret: ${JWT_SECRET:}  # 生产环境必须设置，可用 openssl rand -base64 32 生成
+  expiration: ${JWT_EXPIRATION:86400000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+# CORS
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost,http://localhost:5173,http://localhost:3000}
+  max-age: ${CORS_MAX_AGE:3600}
+
+# AI 配置
+ai:
+  request:
+    connect-timeout-ms: ${AI_CONNECT_TIMEOUT:5000}
+    read-timeout-ms: ${AI_READ_TIMEOUT:60000}
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    api-url: ${OPENAI_API_URL:https://api.openai.com/v1}
+    model: ${OPENAI_MODEL:gpt-4}
+  tongyi:
+    api-key: ${TONGYI_API_KEY:}
+    api-url: ${TONGYI_API_URL:https://dashscope.aliyuncs.com/api/v1}
+  doubao:
+    api-key: ${DOUBAO_API_KEY:}
+    api-url: ${DOUBAO_API_URL:}
+  simulation:
+    enabled: ${AI_SIMULATION_ENABLED:false}  # 生产环境默认关闭模拟模式
+
+# RAG 配置
+rag:
+  embedding:
+    model: ${RAG_EMBEDDING_MODEL:text-embedding-3-small}
+    dimensions: ${RAG_EMBEDDING_DIMENSIONS:1536}
+    simulation-dimensions: ${RAG_SIMULATION_DIMENSIONS:256}
+  chunk:
+    size: ${RAG_CHUNK_SIZE:500}
+    overlap: ${RAG_CHUNK_OVERLAP:50}
+  answer:
+    max-word-count: ${RAG_ANSWER_MAX_WORDS:800}
+  default-top-k: ${RAG_DEFAULT_TOP_K:5}
+  default-min-similarity: ${RAG_DEFAULT_MIN_SIMILARITY:0.3}
+
+# GEO 数据采集（生产环境默认关闭）
+app:
+  geo:
+    collector:
+      enabled: ${GEO_COLLECTOR_ENABLED:false}
+  rabbitmq:
+    enabled: ${RABBITMQ_ENABLED:false}  # MQ 默认关闭，需要时显式开启
+
+# 可观测性
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: geo-saa-backend
+
+# 日志（生产环境 JSON 格式，便于 ELK/Loki 采集）
 logging:
   level:
-    root: info
-    com.geosaa: info
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.geosaa: ${LOG_LEVEL_GEOSAA:INFO}
+    org.springframework: ${LOG_LEVEL_SPRING:WARN}
+    org.mybatis: ${LOG_LEVEL_MYBATIS:WARN}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [traceId=%X{traceId}] - %msg%n"

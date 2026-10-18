@@ -22,7 +22,7 @@
         <java.version>17</java.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <jjwt.version>0.13.0</jjwt.version>
-        <hutool.version>5.8.47</hutool.version>
+        <hutool.version>5.8.48</hutool.version>
     </properties>
 
     <dependencies>
